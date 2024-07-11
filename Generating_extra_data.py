@@ -14,7 +14,7 @@ import random
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
-amount_of_copies_per_salamander: int = 30  # Only useful if save_to_computer if True
+amount_of_copies_per_salamander: int = 30  # Only useful if save_to_computer is True
 
 path: str = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
 # Path refers to the place on your computer where you have two folders with names 2022 and 2024.
