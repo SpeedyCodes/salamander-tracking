@@ -13,11 +13,12 @@ import os
 import random
 
 path: str = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
-# Refers to the place on your computer where you have two folders with names 2022 and 2024.
+# Path refers to the place on your computer where you have two folders with names 2022 and 2024.
 
 location2022: str = '2022/'
 location2024: str = '2024/'
-
+# These locations are the names of two folders. These folders respectively both contain the salamander images
+# of 2022 and 2024.
 
 def filenames_from_folder(folder: str) -> set:
     """ Returns a list of all filenames in a folder."""
