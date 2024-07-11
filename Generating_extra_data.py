@@ -12,6 +12,10 @@ from matplotlib import pyplot as plt
 import os
 import random
 
+""" User input """
+save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
+amount_of_copies_per_salamander: int = 30  # Only useful if save_to_computer if True
+
 path: str = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
 # Path refers to the place on your computer where you have two folders with names 2022 and 2024.
 
@@ -19,6 +23,12 @@ location2022: str = '2022/'
 location2024: str = '2024/'
 # These locations are the names of two folders. These folders respectively both contain the salamander images
 # of 2022 and 2024.
+
+# Thus for example, the location of a specific image should be like the following example:
+# f'{path}{location2022}{2022-Sal02}'
+
+""" End user input """
+
 
 def filenames_from_folder(folder: str) -> set:
     """ Returns a list of all filenames in a folder."""
@@ -105,13 +115,25 @@ def change_image(img_name: str, angle: float, contrast: float, brightness: float
 
 
 if __name__ == '__main__':
-    for name in filenames_from_folder(f'{path}{location2022}'):
-        final_image = change_image(name, angle=360 * random.random(), contrast=random.uniform(0.5, 1.5),
-                                   brightness=random.uniform(-30, 30))
-        cv.imshow(f'{name}', final_image)
-        cv.waitKey(0)
+    for name in filenames_from_folder(f'{path}{location2022}'):  # Looping over all images of a folder.
+        for counter in range(1, amount_of_copies_per_salamander + 1):  # Making copies of a specific image.
 
-        cv.destroyAllWindows()
+            final_image = change_image(name, angle=360 * random.random(), contrast=random.uniform(0.5, 1.5),
+                                       brightness=random.uniform(-30, 30))
+
+            cv.imshow(f'{name}_changed_{counter}', final_image)  # Shows the image.
+
+            if save_to_computer:
+                name2 = name.removesuffix('.jpg')
+                os.makedirs(f'{path}Edited Images/{name2}', exist_ok=True)  # Makes a folder to save the images.
+                # It even works if the folder already existed.
+
+                cv.imwrite(os.path.join(path, f'Edited Images/{name2}/{name}_changed_{counter}.jpg'), final_image)
+                # Saves the images in the right folder (that was just made).
+
+            cv.waitKey(0)
+
+            cv.destroyAllWindows()
 
     # Still issues regarding .heic format:
 
