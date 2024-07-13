@@ -7,8 +7,6 @@ Changes are made by rotations, scaling and adjusting brightness and contrast.
 
 import math
 import cv2 as cv
-import numpy as np
-from matplotlib import pyplot as plt
 import os
 import random
 
