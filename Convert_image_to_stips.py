@@ -166,7 +166,11 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     # this is a white square with black background.
     num_white_pixels = np.sum(isolated_image == 255)
 
-    if num_white_pixels < 100 or num_white_pixels > (height * width - 100):  # Too much or too little white pixels.
+    # In the case that there are too much or too little white pixels.
+    limit = 500
+    ellipse_check = True  # Checks if it needs to draw an ellips or not. In the latter case, it will draw a rectangle.
+    if num_white_pixels < limit or num_white_pixels > (height * width - limit):
+        ellipse_check = False
         isolated_image = np.zeros_like(image)
         size = min(width, height)
         square_size = int(size * larger_square_size)
@@ -177,7 +181,27 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
         y2 = y1 + square_size
         isolated_image[y1:y2, x1:x2] = 255
 
-    return isolated_image
+    # Now we will try to draw a nice figure, like an ellips or rectangle, around the white middle shape.
+    contours_of_middle_shape, _ = cv.findContours(isolated_image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+    surrounded_image = np.zeros_like(image)
+
+    # Combine all existing contours on isolated_image.
+    all_contours_combined = np.concatenate(contours_of_middle_shape)
+
+    if ellipse_check:
+        try:
+            ellipse = cv.fitEllipse(all_contours_combined)
+            cv.ellipse(surrounded_image, ellipse, (255, 255, 255), 2)
+        except cv.error:  # Error? Then we will draw rectangle.
+            x, y, w, h = cv.boundingRect(all_contours_combined)
+            cv.rectangle(surrounded_image, (x, y), (x + w, y + h), (255, 255, 255), 2)
+
+    if not ellipse_check:  # Draw a rectangle around the middle shape.
+        x, y, w, h = cv.boundingRect(all_contours_combined)
+        cv.rectangle(surrounded_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+    return surrounded_image
 
 
 if __name__ == '__main__':
@@ -191,7 +215,7 @@ if __name__ == '__main__':
 
             # cv.imshow('Gaussian Thresholding', th_Gaussian)
             # cv.imshow('Global Thresholding', th_global)
-            # cv.imshow('Median Thresholding', th_mean)
+            cv.imshow('Median Thresholding', th_mean)
 
             # img_with_contours = draw_contours(img, th_global)
             # cv.imshow('Original with contours', img_with_contours)
@@ -203,9 +227,11 @@ if __name__ == '__main__':
             # cv.imshow('blured version', img)
             # cv.waitKey(0)
 
-            is_img = isolate_central_object(th_global)
-            cv.imshow('Isolated', is_img)
-            cv.imshow('Original', th_global)
+            img_blur = pre_processing(img, 7)
+            _, img_blur_global = cv.threshold(img_blur, 110, 255, cv.THRESH_BINARY)
+            isolate_img = isolate_central_object(img_blur_global)
+            cv.imshow('Isolated', isolate_img)
+            cv.imshow('Original', img_blur_global)
             cv.waitKey(0)
             cv.destroyAllWindows()
             break
