@@ -205,10 +205,12 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     return surrounded_image
 
 
-def crop_detailed_image(detailed_image, surrounded_image):
-    """ This method will crop the detailed image using the shape of the surrounded_image of the method
-     isolate_central_object, since both have the same dimensions. Eventually we will return the cropped image,
-     hoping that it."""
+def crop_detailed_image_original_size(detailed_image, surrounded_image):
+    """ This method will change the detailed image using the shape of the surrounded image of the method
+     isolate_central_object, since both have the same dimensions. We will overlap the detailed image and the
+     surrounded image and only leave the part of the detailed image unchanged that is inside the shape.
+     All the pixels on the outside of the image, we change to white. Thus, we return an image with a white background
+     and a detailed fraction of the detailed image in the center."""
 
     contours, _ = cv.findContours(surrounded_image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
@@ -218,8 +220,28 @@ def crop_detailed_image(detailed_image, surrounded_image):
     cv.drawContours(mask, contours, -1, color=[0], thickness=cv.FILLED)  # Make the inside of the shape black,
     # We do this to ensure that this part doesn't get cropped.
 
-    cropped_image = np.where(mask == 255, 255, detailed_image)  # Make the outside of the shape white on the
-    # detailed_image.
+    cropped_image_original_size = np.where(mask == 255, 255, detailed_image)  # Make the outside of the shape white
+    # on the detailed_image.
+
+    return cropped_image_original_size
+
+
+def crop_detailed_image_small_size(cropped_image_original_size):
+    """ This method will literally crop the cropped image. So we remove the non-interesting, white background that we
+    have created in the method crop_detailed_image_original_size. We return an image with smaller size than the original
+    image, but this smaller image only contains key information of the salamander, no extra white background."""
+
+    # We will first need to find the bounding box of the middle shape.
+    # To be able to do this, we first need to change white to black and black to white.
+    cropped_image_original_size = cv.bitwise_not(cropped_image_original_size)
+
+    x, y, w, h = cv.boundingRect(cropped_image_original_size)
+
+    # Now crop the image to the bounding box.
+    cropped_image = cropped_image_original_size[y:y + h, x:x + w]
+
+    # Again reverse the colors back to what we are used to.
+    cropped_image = cv.bitwise_not(cropped_image)
 
     return cropped_image
 
@@ -253,8 +275,12 @@ if __name__ == '__main__':
             cv.imshow('Isolated', isolate_img)
             cv.imshow('Binaire', img_blur_global)
 
-            img_crop = crop_detailed_image(th_mean, isolate_img)
+            img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
+            cv.imshow('Cropped_original_size', img_crop_original_size)
+
+            img_crop = crop_detailed_image_small_size(img_crop_original_size)
             cv.imshow('Cropped', img_crop)
+
             cv.waitKey(0)
             cv.destroyAllWindows()
             break
