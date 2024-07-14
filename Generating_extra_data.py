@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
             cv.destroyAllWindows()
 
-    # Still issues regarding .heic format:
-
-    # for name in filenames_from_folder(f'{path}{location2024}'):
-    #    show_image(name)
+    for name in filenames_from_folder(f'{path}{location2024}'):
+        show_image(name)
+        cv.waitKey(0)
+        cv.destroyAllWindows()

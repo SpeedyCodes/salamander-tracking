@@ -12,7 +12,7 @@ For this we use contour detection algorithm of OpenCV.
 blurred, global thresholding image. This gives a lot of challenges, we need to find the middle shape but also cut of
 the edges if the middle shape, unfortunately, is connected with the edges. Also, the contour detection algorithm is not
 always good, so in extreme cases we need to artificially cheat and create a universally new image.
-5. [NOT DONE YET] Use this new image, where we only have the middle shape, to select a rough middle shape on a very
+5. Use this new image, where we only have the middle shape, to select a rough middle shape on a very
 detailed image, like the images from adaptive mean and adaptive Gaussian thresholds. Thus, with this trick,
 we actually have removed a lot of the annoying background in the good, detailed images, by using a very blurred and
 global thresholding image.
@@ -205,6 +205,25 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     return surrounded_image
 
 
+def crop_detailed_image(detailed_image, surrounded_image):
+    """ This method will crop the detailed image using the shape of the surrounded_image of the method
+     isolate_central_object, since both have the same dimensions. Eventually we will return the cropped image,
+     hoping that it."""
+
+    contours, _ = cv.findContours(surrounded_image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+    # Create a mask, this is a full white image.
+    mask = np.ones_like(surrounded_image) * 255
+
+    cv.drawContours(mask, contours, -1, color=[0], thickness=cv.FILLED)  # Make the inside of the shape black,
+    # We do this to ensure that this part doesn't get cropped.
+
+    cropped_image = np.where(mask == 255, 255, detailed_image)  # Make the outside of the shape white on the
+    # detailed_image.
+
+    return cropped_image
+
+
 if __name__ == '__main__':
     for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
@@ -232,12 +251,10 @@ if __name__ == '__main__':
             _, img_blur_global = cv.threshold(img_blur, 110, 255, cv.THRESH_BINARY)
             isolate_img = isolate_central_object(img_blur_global)
             cv.imshow('Isolated', isolate_img)
-            cv.imshow('Original', img_blur_global)
+            cv.imshow('Binaire', img_blur_global)
+
+            img_crop = crop_detailed_image(th_mean, isolate_img)
+            cv.imshow('Cropped', img_crop)
             cv.waitKey(0)
             cv.destroyAllWindows()
             break
-
-    # Still issues regarding .heic format:
-
-    # for name in filenames_from_folder(f'{path}{location2024}'):
-    #    show_image(name)
