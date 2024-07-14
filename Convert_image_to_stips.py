@@ -26,6 +26,7 @@ import cv2 as cv
 from Generating_extra_data import filenames_from_folder, resize_with_aspect_ratio
 from matplotlib import pyplot as plt
 import numpy as np
+from utils.heic_imread_wrapper import wrapped_imread
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
@@ -208,7 +209,7 @@ if __name__ == '__main__':
     for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
 
-            img = cv.imread(f'{path}/{edited_salamander}/{number}', 0)  # Grayscale is important!
+            img = wrapped_imread(f'{path}/{edited_salamander}/{number}', 0)  # Grayscale is important!
             th_global, th_mean, th_Gaussian = generate_thresholds(img)
 
             # plotting_images(img, th_global, th_mean, th_Gaussian)

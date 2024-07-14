@@ -9,6 +9,7 @@ import math
 import cv2 as cv
 import os
 import random
+from utils.heic_imread_wrapper import wrapped_imread
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
@@ -53,9 +54,9 @@ def resize_with_aspect_ratio(image, width=None, height=None, inter=cv.INTER_AREA
 def read_images(img_name: str):
     """ Reads images by their name."""
     if img_name[:4] == '2022':
-        img = cv.imread(f'{path}{location2022}{img_name}', 0)  # Reads image from 2022.
+        img = wrapped_imread(f'{path}{location2022}{img_name}', 0)  # Reads image from 2022.
     elif img_name[:3] == 'IMG':
-        img = cv.imread(f'{path}{location2024}{img_name}', 0)  # Reads image from 2024.
+        img = wrapped_imread(f'{path}{location2024}{img_name}', 0)  # Reads image from 2024.
     else:
         print('Image not found.')
         return None
