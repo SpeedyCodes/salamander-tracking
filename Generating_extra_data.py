@@ -18,10 +18,14 @@ amount_of_copies_per_salamander: int = 30  # Only useful if save_to_computer is 
 path: str = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
 # Path refers to the place on your computer where you have two folders with names 2022 and 2024.
 
+location2018: str = '2018/'
+location2019: str = '2019/'
+location2021: str = '2021/'
 location2022: str = '2022/'
 location2024: str = '2024/'
-# These locations are the names of two folders. These folders respectively both contain the salamander images
-# of 2022 and 2024.
+locationOnline: str = 'Online/'
+# These locations are the names of a lot of folders. These folders respectively contain the salamander images
+# of the year that they represent.
 
 # Thus for example, the location of a specific image should be like the following example:
 # f'{path}{location2022}{2022-Sal02}'
@@ -53,10 +57,20 @@ def resize_with_aspect_ratio(image, width=None, height=None, inter=cv.INTER_AREA
 
 def read_images(img_name: str):
     """ Reads images by their name."""
-    if img_name[:4] == '2022':
-        img = wrapped_imread(f'{path}{location2022}{img_name}', 0)  # Reads image from 2022.
-    elif img_name[:3] == 'IMG':
+    img_prefix = img_name[:4]
+
+    if img_prefix == '2018':
+        img = wrapped_imread(f'{path}{location2018}{img_name}', 0)  # Reads image from 2022.
+    elif img_prefix == '2019':
+        img = wrapped_imread(f'{path}{location2019}{img_name}', 0)  # Reads image from 2024.
+    elif img_prefix == '2021':
+        img = wrapped_imread(f'{path}{location2021}{img_name}', 0)  # Reads image from 2024.
+    elif img_prefix == '2022':
+        img = wrapped_imread(f'{path}{location2022}{img_name}', 0)  # Reads image from 2024.
+    elif img_prefix == '2024':
         img = wrapped_imread(f'{path}{location2024}{img_name}', 0)  # Reads image from 2024.
+    elif img_name[:6] == 'online':
+        img = wrapped_imread(f'{path}{locationOnline}{img_name}', 0)  # Reads image from 2024.
     else:
         print('Image not found.')
         return None
@@ -114,27 +128,24 @@ def change_image(img_name: str, angle: float, contrast: float, brightness: float
 
 
 if __name__ == '__main__':
-    for name in filenames_from_folder(f'{path}{location2022}'):  # Looping over all images of a folder.
+
+    for name in filenames_from_folder(f'{path}{location2018}'):  # Looping over all images of a folder.
         for counter in range(1, amount_of_copies_per_salamander + 1):  # Making copies of a specific image.
 
             final_image = change_image(name, angle=360 * random.random(), contrast=random.uniform(0.5, 1.5),
                                        brightness=random.uniform(-30, 30))
 
-            cv.imshow(f'{name}_changed_{counter}', final_image)  # Shows the image.
+            # cv.imshow(f'{name}_changed_{counter}', final_image)  # Shows the image.
 
             if save_to_computer:
                 name2 = name.removesuffix('.jpg')
-                os.makedirs(f'{path}Edited Images/{name2}', exist_ok=True)  # Makes a folder to save the images.
-                # It even works if the folder already existed.
+                os.makedirs(f'{path}Edited Images/{location2018}{name2}', exist_ok=True)  # Makes a folder to
+                # save the images. It even works if the folder already existed.
 
-                cv.imwrite(os.path.join(path, f'Edited Images/{name2}/{name}_changed_{counter}.jpg'), final_image)
+                cv.imwrite(os.path.join(path, f'Edited Images/{location2018}{name2}/{name}_changed_{counter}.jpg'),
+                           final_image)
                 # Saves the images in the right folder (that was just made).
 
-            cv.waitKey(0)
+            # cv.waitKey(0)
 
-            cv.destroyAllWindows()
-
-    for name in filenames_from_folder(f'{path}{location2024}'):
-        show_image(name)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
+            # cv.destroyAllWindows()
