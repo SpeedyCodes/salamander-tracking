@@ -1,5 +1,6 @@
 .idea
 input
 venv
-haar-training/bins
-haar-training/negative
+training/haar_cascade/bins
+training/haar_cascade/negative
+__pycache__
