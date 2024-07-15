@@ -31,14 +31,39 @@ from utils.heic_imread_wrapper import wrapped_imread
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
 
-path: str = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/Edited images/'
+path: str = ('C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
+             'Edited images/2022/')
 # path refers to the place where you have all your different edited folders.
 """ End user input """
 
 
-def pre_processing(image, ksize):
-    """ Pre-processing steps for image editing. """
-    return cv.medianBlur(image, ksize)
+def pre_processing(image, ksize, stddev, full_blur: bool):
+    """ Pre-processing steps for image editing. These are the steps done in the beginning of the proces. """
+
+    # Full_blur is True will use the standard, rough, blur (is more useful for finding a rough shape of the salamander).
+    # Full_blur is False will use more advanced methods, like Gaussian blur.
+
+    if full_blur:
+        image_divided = cv.blur(image, (ksize, ksize))
+        return image_divided
+
+    image_blurred = cv.GaussianBlur(image, (ksize, ksize), sigmaX=stddev, sigmaY=stddev)
+    image_divided = cv.divide(image, image_blurred, scale=255)  # Dividing gives a better background with less noise.
+    return image_divided
+
+
+def post_processing(image, kernel_size, threshold):
+    """ Post-processing steps for image editing. These are the steps done at the end of the proces.
+    When we have a detailed image of the belly of the salamander, we need to group neighbouring small stips into
+    big stips and remove noise."""
+
+    # Pure blurring the image such that we get nice big dots.
+    image_blur = cv.blur(image, (kernel_size, kernel_size))
+
+    # Remove noise.
+    _, image_blur_threshold = cv.threshold(image_blur, threshold, 255, cv.THRESH_BINARY)
+
+    return image_blur_threshold
 
 
 def generate_thresholds(image):
@@ -50,12 +75,17 @@ def generate_thresholds(image):
     # 3, 5, 7, and so on.
     # C = constant subtracted from the mean or weighted mean. Normally, it is positive.
 
-    image = pre_processing(image, 3)  # 127
-    _, img_th_global = cv.threshold(image, 110, 255, cv.THRESH_BINARY)
-    img_th_mean = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_MEAN_C,
+    image_copy = image.copy()
+    image_copy = pre_processing(image_copy, 77, 77, False)
+
+    image = cv.medianBlur(image, 3)
+    _, img_th_global = cv.threshold(image, 110, 255, cv.THRESH_BINARY)  # Use less pre_processing.
+
+    img_th_mean = cv.adaptiveThreshold(image_copy, 255, cv.ADAPTIVE_THRESH_MEAN_C,
                                        cv.THRESH_BINARY, 5, 4)
-    img_th_Gaussian = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+    img_th_Gaussian = cv.adaptiveThreshold(image_copy, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
                                            cv.THRESH_BINARY, 5, 4)
+
     return img_th_global, img_th_mean, img_th_Gaussian
 
 
@@ -107,7 +137,7 @@ def find_closest_white_point(image, center_x, center_y, window_size=30):
     return closest_point
 
 
-def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.4):
+def isolate_central_object(image, central_region_size=0.15, larger_square_size=0.4):
     """ Given a binaire image, who has a black background and white shapes. This method will return a new image,
     also with black background, but only with the most centered shape remaining.
     Thus, we remove all other white shapes."""
@@ -137,10 +167,11 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     central_y2 = min(center_y + int(height * central_region_size / 2), height)
 
     # Find the contours of the objects.
-    contours, _ = cv.findContours(image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-
+    """ MAYBE CHANGE "RETR_STYLE" LATER ON IF THAT SEEMS BETTER!"""
+    contours, _ = cv.findContours(image, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
     # Create a mask for contours that run through the central region.
     mask = np.zeros_like(image)
+
     for contour in contours:
         if any(central_x1 < x < central_x2 and central_y1 < y < central_y2 for x, y in contour[:, 0, :]):
             cv.drawContours(mask, [contour], -1, [255], thickness=cv.FILLED)
@@ -148,6 +179,9 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     # Create a new image with only the central object isolated.
     isolated_image = np.zeros_like(image)
     isolated_image[mask == 255] = 255
+
+    cv.imshow('isolated image', isolated_image)
+    cv.waitKey()
 
     # Define the larger square region for making pixels outside black
     larger_x1 = max(center_x - int(width * larger_square_size / 2), 0)
@@ -168,7 +202,7 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     num_white_pixels = np.sum(isolated_image == 255)
 
     # In the case that there are too much or too little white pixels.
-    limit = 500
+    limit = 1200
     ellipse_check = True  # Checks if it needs to draw an ellips or not. In the latter case, it will draw a rectangle.
     if num_white_pixels < limit or num_white_pixels > (height * width - limit):
         ellipse_check = False
@@ -193,6 +227,8 @@ def isolate_central_object(image, central_region_size=0.1, larger_square_size=0.
     if ellipse_check:
         try:
             ellipse = cv.fitEllipse(all_contours_combined)
+            # Increase the size of the ellipse by scaling its axes with 10%, this ensures that we don't forget anything.
+            ellipse = (ellipse[0], (ellipse[1][0] * 1.1, ellipse[1][1] * 1.1), ellipse[2])
             cv.ellipse(surrounded_image, ellipse, (255, 255, 255), 2)
         except cv.error:  # Error? Then we will draw rectangle.
             x, y, w, h = cv.boundingRect(all_contours_combined)
@@ -250,37 +286,42 @@ if __name__ == '__main__':
     for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
 
+            """ Loading in the image."""
             img = wrapped_imread(f'{path}/{edited_salamander}/{number}', 0)  # Grayscale is important!
+
+            """ Generating different thresholds. """
             th_global, th_mean, th_Gaussian = generate_thresholds(img)
-
             # plotting_images(img, th_global, th_mean, th_Gaussian)
-
             # cv.imshow('Gaussian Thresholding', th_Gaussian)
             # cv.imshow('Global Thresholding', th_global)
-            cv.imshow('Median Thresholding', th_mean)
-
-            # img_with_contours = draw_contours(img, th_global)
-            # cv.imshow('Original with contours', img_with_contours)
+            # cv.imshow('Median Thresholding', th_mean)
             # cv.waitKey(0)
             # cv.destroyAllWindows()
 
-            # img = pre_processing(img, 9)
-            # _, img = cv.threshold(img, 110, 255, cv.THRESH_BINARY)
-            # cv.imshow('blured version', img)
-            # cv.waitKey(0)
-
-            img_blur = pre_processing(img, 7)
+            """ Pre-processing of the image. ksize = 7 is found experimentally."""
+            img_blur = pre_processing(img, 7, None, True)
+            cv.imshow('Pre-processing', img_blur)
             _, img_blur_global = cv.threshold(img_blur, 110, 255, cv.THRESH_BINARY)
-            isolate_img = isolate_central_object(img_blur_global)
-            cv.imshow('Isolated', isolate_img)
             cv.imshow('Binaire', img_blur_global)
 
+            """ Isolating central object."""
+            isolate_img = isolate_central_object(img_blur_global)
+            cv.imshow('Isolated', isolate_img)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
+
+            """ Cropping the image."""
             img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
             cv.imshow('Cropped_original_size', img_crop_original_size)
-
             img_crop = crop_detailed_image_small_size(img_crop_original_size)
+            cv.waitKey()
             cv.imshow('Cropped', img_crop)
+
+            """ Post-processing of the image."""
+            img_post_proc = post_processing(img_crop, 5, 180)
+            cv.imshow('Image post-processing', img_post_proc)
 
             cv.waitKey(0)
             cv.destroyAllWindows()
             break
+
