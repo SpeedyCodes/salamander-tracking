@@ -16,8 +16,8 @@ always good, so in extreme cases we need to artificially cheat and create a univ
 detailed image, like the images from adaptive mean and adaptive Gaussian thresholds. Thus, with this trick,
 we actually have removed a lot of the annoying background in the good, detailed images, by using a very blurred and
 global thresholding image.
-6. [NOT DONE YET] Now we only have a detailed image of the salamander, with minimal background. We will now use a
-method [TBC] to detect the stips in this image.
+6. Now we only have a detailed image of the salamander, with minimal background. We will now use a
+method to detect the stips in this image.
 7. [NOT DONE YET] We will try to remove false positives and then add all the data in a matrix. This will be the end
 of this file.
 """
@@ -27,6 +27,7 @@ from Generating_extra_data import filenames_from_folder, resize_with_aspect_rati
 from matplotlib import pyplot as plt
 import numpy as np
 from utils.heic_imread_wrapper import wrapped_imread
+
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
@@ -282,6 +283,94 @@ def crop_detailed_image_small_size(cropped_image_original_size):
     return cropped_image
 
 
+def gaussian_weight(distance, sigma):
+    """ Returns the value of the Gaussian weight function. This is needed for better results in detect_dots."""
+
+    # Documentation:
+    # Distance is the distance from the center of the dot to the middle of the image.
+    # Sigma controls the width of the Gaussian curve.
+
+    weight = np.exp(-(distance ** 2) / (2 * sigma ** 2))
+
+    return weight
+
+
+def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
+    """ This function will detect the dots on the cropped image of the belly of the salamander.
+    Next it will try to isolate the good dots and bad dots from each other.
+    Good dots are dots that are indeed dots of the salamander, these have a lot of white around them.
+    Bad dots are false positives and come from the noise in the background. Mostly these have a lot of black around
+    them, so we can isolate the dots on this fact: the percentage of white and black around the dots.
+    To be more accurate, we will change the threshold (this percentage), for what we call a good or bad dot based
+    on the location on the image. If the dot is near the edge of the image, it is more likely from noise and hence we
+    can lower our threshold, thus we need less other black noise around it to consider it a bad dot. While dots in the
+    center are more likely to be good dots, thus these need more black around them to be labeled false positives and
+    hence bad dots. This computation of the threshold is done such that the threshold is continuous. This will give
+    the best results and that's why we use the Gaussian weight function."""
+
+    # Documentation:
+    # min_area is the minimum area of what a dot can be.
+    # max_area is the maximum area of what a dot can be.
+    # Sigma_divider is used for the Gaussian_weight function.
+
+    # Output will be an image with green (good) dots and red (bad) dots.
+
+    # Find contours, we use RETR_TREE for more accurate results. MAYBE CHANGE LATER.
+    contours, _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    output_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)  # We want color for green and red dots.
+
+    height, width = image.shape[:2]
+    center_x, center_y = width // 2, height // 2
+
+    # Processing of each dot, we calculate the center of the dots, using cv.moments.
+    for contour in contours:
+        area = cv.contourArea(contour)
+        if min_area < area < max_area:
+            M = cv.moments(contour)
+
+            if M['m00'] != 0:
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+
+                radius = int(np.sqrt(area / np.pi))
+
+                distance_from_center_image = np.sqrt((cx - center_x) ** 2 + (cy - center_y) ** 2)
+
+                sigma = width / sigma_divider
+                weight = gaussian_weight(distance_from_center_image, sigma)
+
+                # Calculate continuous threshold percentage based on weight. MAY BE CHANGED IN THE FUTURE!
+                min_threshold_percentage = 15
+                max_threshold_percentage = 45
+                threshold_percentage = min_threshold_percentage + weight * (
+                            max_threshold_percentage - min_threshold_percentage)
+
+                # Try to compute how much black is around the dots.
+                # Do this by making a new bigger circle, around the existing one, thus we also will make two masks.
+                original_circle_mask = np.zeros_like(image)
+                larger_circle_mask = np.zeros_like(image)
+                cv.circle(original_circle_mask, (cx, cy), radius, [255], -1)
+                cv.circle(larger_circle_mask, (cx, cy), 2 * radius, [255], -1)
+
+                # Create intermediate mask which is the area between larger circle and original circle.
+                intermediate_mask = cv.bitwise_xor(larger_circle_mask, original_circle_mask)
+
+                # Calculate percentage of white and black pixels within the larger circle
+                total_pixels = np.count_nonzero(intermediate_mask)
+                white_pixels = np.count_nonzero(intermediate_mask & image)
+                black_pixels = total_pixels - white_pixels
+                black_percentage = (black_pixels / total_pixels) * 100
+
+                # Color the dot based on black percentage; the threshold
+                if black_percentage > threshold_percentage:
+                    cv.circle(output_image, (cx, cy), radius, (0, 0, 255), -1)  # Red
+                else:
+                    cv.circle(output_image, (cx, cy), radius, (0, 255, 0), -1)  # Green
+
+    return output_image
+
+
 if __name__ == '__main__':
     for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
@@ -321,7 +410,9 @@ if __name__ == '__main__':
             img_post_proc = post_processing(img_crop, 5, 180)
             cv.imshow('Image post-processing', img_post_proc)
 
+            dots = detect_dots(img_post_proc)
+            cv.imshow('Dots', dots)
+
             cv.waitKey(0)
             cv.destroyAllWindows()
             break
-
