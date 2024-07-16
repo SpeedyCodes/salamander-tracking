@@ -1,0 +1,24 @@
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal01.jpg 4 412 322 29 28 463 336 24 27 499 333 18 26 349 298 28 28
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal02.jpg 3 594 319 34 26 518 316 28 33 467 320 34 33
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal03.jpg 11 586 495 35 36 635 515 23 33 683 498 24 32 719 494 23 31 494 503 31 25 730 527 29 30 667 547 31 32 776 541 32 31 816 507 25 27 862 522 21 23 893 547 20 23
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal04.jpg 3 663 286 21 22 590 302 16 20 554 294 23 26
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal05.jpg 10 652 440 30 45 703 461 33 36 474 429 36 37 424 432 39 39 752 467 29 30 789 479 30 34 719 509 24 38 453 480 36 31 681 498 36 46 520 459 30 27
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal06.jpg 0
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal07.jpg 1 286 221 11 14
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal08.jpg 3 752 621 37 42 815 658 30 35 586 596 40 36
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal09.jpg 1 368 257 9 13
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal10.jpg 4 309 205 12 11 292 206 10 13 275 216 9 12 340 200 9 9
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal11.jpg 4 645 435 20 20 685 427 17 19 569 403 22 16 599 424 19 15
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal12.jpg 6 426 304 19 21 467 326 22 20 573 312 17 26 608 326 19 18 439 333 23 19 484 303 23 20
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal13.jpg 2 466 265 11 16 507 261 19 17
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal14.jpg 5 355 254 23 19 412 257 20 17 511 226 20 22 313 274 23 19 480 237 27 25
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal15.jpg 5 486 227 19 25 510 264 19 23 569 263 19 23 376 239 22 19 373 207 32 29
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal16.jpg 6 424 470 23 26 364 479 27 21 465 504 18 19 461 467 20 17 396 469 25 25 308 460 19 17
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal17.jpg 5 474 200 24 26 678 175 29 22 612 169 21 23 617 202 23 23 698 142 28 25
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal18.jpg 7 283 323 30 27 365 344 27 29 450 375 29 27 345 317 23 23 485 390 17 22 511 406 23 23 544 421 20 20
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal19.jpg 15 411 257 23 23 372 293 28 28 457 258 22 22 408 300 24 23 457 292 23 24 505 263 21 24 550 267 26 28 524 296 24 24 593 273 19 18 646 270 22 25 618 245 15 19 582 307 20 21 597 230 16 14 531 231 21 19 675 250 19 24
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal20.jpg 9 459 141 30 27 505 134 20 23 598 140 22 27 551 165 16 25 690 154 24 26 637 176 21 21 722 189 20 21 567 146 17 28 401 159 22 26
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal21.jpg 0
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal22.jpg 0
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal23.jpg 0
+D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/Universiteit Antwerpen/Rune De Coninck - Foto's/2019\2019-Sal24.jpg 2 571 341 35 40 469 323 37 43
