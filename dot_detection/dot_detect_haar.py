@@ -14,15 +14,12 @@ def draw_rectangles(img, rectangles):
 
 
 cascade = cv.CascadeClassifier('../training/haar_cascade/cascade/cascade.xml')
-input = wrapped_imread('../input/2024/IMG_3023.jpeg')
+#input = wrapped_imread('../input/2024/IMG_3023.jpeg')
+input = wrapped_imread('../input/2024/IMG_3024.jpeg')
+#input = wrapped_imread('../input/2021/2021-Sal09.jpg')
+#input = wrapped_imread('../input/2019/2019-Sal18.jpg')
 
 rectangles = cascade.detectMultiScale(input)
 detection_image = draw_rectangles(input, rectangles)
 
-cv.imshow('Matches', detection_image)
-
-while True:
-    key = cv.waitKey(1)
-    if key == ord('q'):
-        cv.destroyAllWindows()
-        break
+cv.imwrite('detection.jpg', detection_image)
