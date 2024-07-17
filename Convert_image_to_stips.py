@@ -18,8 +18,10 @@ we actually have removed a lot of the annoying background in the good, detailed 
 global thresholding image.
 6. Now we only have a detailed image of the salamander, with minimal background. We will now use a
 method to detect the stips in this image.
-7. [NOT DONE YET] We will try to remove false positives and then add all the data in a matrix. This will be the end
+7. We will try to remove false positives and then add all the data in a matrix. This will be the end
 of this file.
+8. [NOT DONE YET] Optimize the program and improve all the steps such that the program can handle images with worse
+quality and can easily detect false positive dots.
 """
 
 import cv2 as cv
@@ -311,7 +313,9 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     # Documentation:
     # min_area is the minimum area of what a dot can be.
     # max_area is the maximum area of what a dot can be.
-    # Sigma_divider is used for the Gaussian_weight function.
+    # Sigma_divider is used for the Gaussian_weight function. It helps in the following manner:
+    # If too many dots far from the center are classified as good, then increase the sigma_divider.
+    # If too many dots near the center are classified as bad, then decrease the sigma_divider.
 
     # Output will be an image with green (good) dots and red (bad) dots.
 
@@ -371,6 +375,28 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     return output_image
 
 
+def image_to_matrix(image):
+    """ Will transform the image of the belly of the salamander with the green and red dots to a matrix where only
+    the green dots remain. These will have value 1 in the matrix. The other entries have value 0."""
+
+    green_mask = np.all(image == (0, 255, 0), axis=-1)  # Detect the green dots in the image.
+
+    matrix = np.zeros_like(image[:, :, 0])
+    matrix[green_mask] = 1
+
+    return matrix
+
+
+def display_matrix(matrix):
+    """ Displays the matrix in a nice way."""
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(matrix, cmap='Greys', interpolation='nearest')
+    plt.title('Matrix Representation of Green Dots')
+    plt.colorbar()
+    plt.show()
+
+
 if __name__ == '__main__':
     for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
@@ -410,9 +436,15 @@ if __name__ == '__main__':
             img_post_proc = post_processing(img_crop, 5, 180)
             cv.imshow('Image post-processing', img_post_proc)
 
+            """ Detecting the dots."""
             dots = detect_dots(img_post_proc)
             cv.imshow('Dots', dots)
 
+            """ Representing the good dots in a matrix and showing this matrix."""
+            matrix_with_dots = image_to_matrix(dots)
+            display_matrix(matrix_with_dots)
+
             cv.waitKey(0)
             cv.destroyAllWindows()
+
             break
