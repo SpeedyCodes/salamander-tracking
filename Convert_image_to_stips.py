@@ -46,7 +46,7 @@ def convert_image_to_coordinate_stips(image: np.ndarray) -> set[tuple[int, int, 
 
     INPUT: numpy array image (this can be in BGR format), this type of image can be obtained by wrapped_imread.
     OUTPUT: set with 4-tupels: (x-coordinate of center dot, y-coordinate of center dot, radius of dot,
-    good or bad dot, this is a boolean)."""
+    good or bad dot: this is a boolean)."""
 
     # Conversion to grayscale, this is important!
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
