@@ -40,6 +40,39 @@ path: str = ('C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdiscip
 """ End user input """
 
 
+def convert_image_to_coordinate_stips(image: np.ndarray) -> set[tuple[int, int, int, bool]]:
+    """ This function will include a bunch of other function, it will return the coordinates of the good stips
+    on the belly of the salamander.
+
+    INPUT: numpy array image (this can be in BGR format), this type of image can be obtained by wrapped_imread.
+    OUTPUT: set with 4-tupels: (x-coordinate of center dot, y-coordinate of center dot, radius of dot,
+    good or bad dot, this is a boolean)."""
+
+    # Conversion to grayscale, this is important!
+    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+
+    # Generating local mean threshold.
+    _, image_th_mean, _ = generate_thresholds(img)
+
+    # Pre-processing of the image. ksize = 7 is found experimentally.
+    image_blur = pre_processing(image, 7, None, True)
+    _, image_blur_th_global = cv.threshold(image_blur, 110, 255, cv.THRESH_BINARY)
+
+    # Isolating central object.
+    image_isolate = isolate_central_object(image_blur_th_global)
+
+    # Cropping the image.
+    image_crop_original_size = crop_detailed_image_original_size(image_th_mean, image_isolate)
+
+    # Post-processing of the image.
+    image_post_proc = post_processing(image_crop_original_size, 5, 180)
+
+    # Detecting the dots.
+    list_of_dots = detect_dots(image_post_proc)
+
+    return list_of_dots
+
+
 def pre_processing(image, ksize, stddev, full_blur: bool):
     """ Pre-processing steps for image editing. These are the steps done in the beginning of the proces. """
 
@@ -308,7 +341,10 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     can lower our threshold, thus we need less other black noise around it to consider it a bad dot. While dots in the
     center are more likely to be good dots, thus these need more black around them to be labeled false positives and
     hence bad dots. This computation of the threshold is done such that the threshold is continuous. This will give
-    the best results and that's why we use the Gaussian weight function."""
+    the best results and that's why we use the Gaussian weight function.
+
+    This function returns a set which consists of 4-tupels with cartesian coordinates of the center point and the
+    radius and if the dot is good or bad."""
 
     # Documentation:
     # min_area is the minimum area of what a dot can be.
@@ -325,7 +361,7 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     height, width = image.shape[:2]
     center_x, center_y = width // 2, height // 2
 
-    output = set()
+    list_of_dots = set()
 
     # Processing of each dot, we calculate the center of the dots, using cv.moments.
     for contour in contours:
@@ -366,33 +402,42 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
                 black_pixels = total_pixels - white_pixels
                 black_percentage = (black_pixels / total_pixels) * 100
 
-                output.add((cx, cy, radius, black_percentage < threshold_percentage))
+                list_of_dots.add((cx, cy, radius, black_percentage < threshold_percentage))
 
-    return output
+    return list_of_dots
 
 
-def draw_dots(image, dots):
-    """ This method will draw the dots on the image. """
+def draw_dots(image, list_of_dots):
+    """ This method will draw green dots (good dots) and red dots (false positives) on an image. """
 
-    output_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)  # We want color for green and red dots.
-    for dot in dots:
+    image_with_dots = cv.cvtColor(image, cv.COLOR_GRAY2BGR)  # We want color for green and red dots.
+    for dot in list_of_dots:
         cx, cy, radius, is_good_dot = dot
+
         # Color the dot based on black percentage; the threshold
         if is_good_dot:
-            cv.circle(output_image, (cx, cy), radius, (0, 255, 0), -1)  # Green
+            cv.circle(image_with_dots, (cx, cy), radius, (0, 255, 0), -1)  # Green
         else:
-            cv.circle(output_image, (cx, cy), radius, (0, 0, 255), -1)  # Red
+            cv.circle(image_with_dots, (cx, cy), radius, (0, 0, 255), -1)  # Red
 
-    return output_image
+    return image_with_dots
 
-def image_to_matrix(image):
-    """ Will transform the image of the belly of the salamander with the green and red dots to a matrix where only
-    the green dots remain. These will have value 1 in the matrix. The other entries have value 0."""
 
-    green_mask = np.all(image == (0, 255, 0), axis=-1)  # Detect the green dots in the image.
+def image_to_matrix(image, list_of_dots):
+    """ This method will use a list of coordinates of dots from a salamander image. Then it will convert these
+      coordinates to entries of a matrix. These entries will have value 1 in the matrix if the pixel corresponding
+      to that entry lies within a good dot. The other entries have value 0."""
 
-    matrix = np.zeros_like(image[:, :, 0])
-    matrix[green_mask] = 1
+    height, width = image.shape[:2]
+    matrix = np.zeros((height, width), dtype=int)
+
+    for cx, cy, radius, is_good in list_of_dots:
+        if is_good:  # Only care about the good dots.
+            for x in range(cx - radius, cx + radius + 1):
+                for y in range(cy - radius, cy + radius + 1):
+                    # Check if it is indeed a pixel within the circle.
+                    if 0 <= x < width and 0 <= y < height and (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2:
+                        matrix[y, x] = 1  # Because of strange indexing.
 
     return matrix
 
@@ -412,7 +457,8 @@ if __name__ == '__main__':
         for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
 
             """ Loading in the image."""
-            img = wrapped_imread(f'{path}/{edited_salamander}/{number}', 0)  # Grayscale is important!
+            img = wrapped_imread(f'{path}/{edited_salamander}/{number}')
+            img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # Grayscale is important!
 
             """ Generating different thresholds. """
             th_global, th_mean, th_Gaussian = generate_thresholds(img)
@@ -448,11 +494,11 @@ if __name__ == '__main__':
 
             """ Detecting the dots."""
             dots = detect_dots(img_post_proc)
-            dots_image = draw_dots(img_crop, dots)
-            cv.imshow('Dots', dots_image)
+            img_dots = draw_dots(img_crop, dots)
+            cv.imshow('Dots', img_dots)
 
             """ Representing the good dots in a matrix and showing this matrix."""
-            matrix_with_dots = image_to_matrix(dots_image)
+            matrix_with_dots = image_to_matrix(img_dots, dots)
             display_matrix(matrix_with_dots)
 
             cv.waitKey(0)
