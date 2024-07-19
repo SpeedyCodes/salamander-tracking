@@ -322,10 +322,10 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     # Find contours, we use RETR_TREE for more accurate results. MAYBE CHANGE LATER.
     contours, _ = cv.findContours(image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
-    output_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)  # We want color for green and red dots.
-
     height, width = image.shape[:2]
     center_x, center_y = width // 2, height // 2
+
+    output = set()
 
     # Processing of each dot, we calculate the center of the dots, using cv.moments.
     for contour in contours:
@@ -366,14 +366,24 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
                 black_pixels = total_pixels - white_pixels
                 black_percentage = (black_pixels / total_pixels) * 100
 
-                # Color the dot based on black percentage; the threshold
-                if black_percentage > threshold_percentage:
-                    cv.circle(output_image, (cx, cy), radius, (0, 0, 255), -1)  # Red
-                else:
-                    cv.circle(output_image, (cx, cy), radius, (0, 255, 0), -1)  # Green
+                output.add((cx, cy, radius, black_percentage < threshold_percentage))
+
+    return output
+
+
+def draw_dots(image, dots):
+    """ This method will draw the dots on the image. """
+
+    output_image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)  # We want color for green and red dots.
+    for dot in dots:
+        cx, cy, radius, is_good_dot = dot
+        # Color the dot based on black percentage; the threshold
+        if is_good_dot:
+            cv.circle(output_image, (cx, cy), radius, (0, 255, 0), -1)  # Green
+        else:
+            cv.circle(output_image, (cx, cy), radius, (0, 0, 255), -1)  # Red
 
     return output_image
-
 
 def image_to_matrix(image):
     """ Will transform the image of the belly of the salamander with the green and red dots to a matrix where only
@@ -438,10 +448,11 @@ if __name__ == '__main__':
 
             """ Detecting the dots."""
             dots = detect_dots(img_post_proc)
-            cv.imshow('Dots', dots)
+            dots_image = draw_dots(img_crop, dots)
+            cv.imshow('Dots', dots_image)
 
             """ Representing the good dots in a matrix and showing this matrix."""
-            matrix_with_dots = image_to_matrix(dots)
+            matrix_with_dots = image_to_matrix(dots_image)
             display_matrix(matrix_with_dots)
 
             cv.waitKey(0)
