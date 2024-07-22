@@ -13,13 +13,19 @@ def draw_rectangles(img, rectangles):
     return img
 
 
-cascade = cv.CascadeClassifier('../training/haar_cascade/cascade/cascade.xml')
-#input = wrapped_imread('../input/2024/IMG_3023.jpeg')
-input = wrapped_imread('../input/2024/IMG_3024.jpeg')
-#input = wrapped_imread('../input/2021/2021-Sal09.jpg')
-#input = wrapped_imread('../input/2019/2019-Sal18.jpg')
+cascade = cv.CascadeClassifier('training/haar_cascade/cascade/cascade.xml')
 
-rectangles = cascade.detectMultiScale(input)
-detection_image = draw_rectangles(input, rectangles)
 
-cv.imwrite('detection.jpg', detection_image)
+def dot_detect_haar(image):
+    return cascade.detectMultiScale(image)
+
+if __name__ == '__main__':
+    #input = wrapped_imread('../input/2024/IMG_3023.jpeg')
+    #input = wrapped_imread('../input/2024/IMG_3024.jpeg')
+    #input = wrapped_imread('../input/2021/2021-Sal09.jpg')
+    input = wrapped_imread('../input/2019/2019-Sal18.jpg')
+
+    rectangles = cascade.detectMultiScale(input)
+    detection_image = draw_rectangles(input, rectangles)
+
+    cv.imwrite('detection.jpg', detection_image)

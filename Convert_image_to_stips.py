@@ -52,7 +52,7 @@ def convert_image_to_coordinate_stips(image: np.ndarray) -> set[tuple[int, int, 
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
     # Generating local mean threshold.
-    _, image_th_mean, _ = generate_thresholds(img)
+    _, image_th_mean, _ = generate_thresholds(image)
 
     # Pre-processing of the image. ksize = 7 is found experimentally.
     image_blur = pre_processing(image, 7, None, True)
