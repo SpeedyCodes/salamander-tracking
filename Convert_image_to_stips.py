@@ -8,10 +8,14 @@ the salamander. We will do this in multiple steps.
 2. Threshold the image, with global, local mean and local Gaussian thresholds.
 3. Blur the image and apply global thresholding to find some rough shapes, the middle shape will be from the salamander.
 For this we use contour detection algorithm of OpenCV.
-4. Get a new image where we only see this middle shape from the salamander. Thus, we removed background in the
+4.
+OLD VERSION:
+Get a new image where we only see this middle shape from the salamander. Thus, we removed background in the
 blurred, global thresholding image. This gives a lot of challenges, we need to find the middle shape but also cut of
 the edges if the middle shape, unfortunately, is connected with the edges. Also, the contour detection algorithm is not
 always good, so in extreme cases we need to artificially cheat and create a universally new image.
+NEW VERSION:
+We use the code from isolate_salamander.py to find and isolate this middle shape.
 5. Use this new image, where we only have the middle shape, to select a rough middle shape on a very
 detailed image, like the images from adaptive mean and adaptive Gaussian thresholds. Thus, with this trick,
 we actually have removed a lot of the annoying background in the good, detailed images, by using a very blurred and
@@ -26,10 +30,10 @@ quality and can easily detect false positive dots.
 
 import cv2 as cv
 from Generating_extra_data import filenames_from_folder, resize_with_aspect_ratio
+from isolate_salamander import isolate_salamander
 from matplotlib import pyplot as plt
 import numpy as np
 from utils.heic_imread_wrapper import wrapped_imread
-
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.
@@ -37,29 +41,41 @@ save_to_computer: bool = False  # Put this on True if you want to save the image
 path: str = ('C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
              'Edited images/2022/')
 # path refers to the place where you have all your different edited folders.
+
+old_new: bool = True  # True for new version, False for old version.
 """ End user input """
 
 
-def convert_image_to_coordinate_stips(image: np.ndarray) -> set[tuple[int, int, int, bool]]:
-    """ This function will include a bunch of other function, it will return the coordinates of the good stips
+def convert_image_to_coordinate_stips(image: np.ndarray, version: bool = True) -> set[tuple[int, int, int, bool]]:
+    """ This function will include a bunch of other functions, it will return the coordinates of the good stips
     on the belly of the salamander.
 
     INPUT: numpy array image (this can be in BGR format), this type of image can be obtained by wrapped_imread.
+    INPUT: boolean, False will give old version, True will give new version.
     OUTPUT: set with 4-tupels: (x-coordinate of center dot, y-coordinate of center dot, radius of dot,
     good or bad dot: this is a boolean)."""
 
-    # Conversion to grayscale, this is important!
-    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    if not version:  # Old version
 
-    # Generating local mean threshold.
-    _, image_th_mean, _ = generate_thresholds(image)
+        # Conversion to grayscale, this is important!
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
-    # Pre-processing of the image. ksize = 7 is found experimentally.
-    image_blur = pre_processing(image, 7, None, True)
-    _, image_blur_th_global = cv.threshold(image_blur, 110, 255, cv.THRESH_BINARY)
+        # Generating local mean threshold.
+        _, image_th_mean, _ = generate_thresholds(image)
 
-    # Isolating central object.
-    image_isolate = isolate_central_object(image_blur_th_global)
+        # Pre-processing of the image. ksize = 7 is found experimentally.
+        image_blur = pre_processing(image, 7, None, True)
+        _, image_blur_th_global = cv.threshold(image_blur, 110, 255, cv.THRESH_BINARY)
+
+        # Isolating central object.
+        image_isolate = isolate_central_object(image_blur_th_global)
+
+    else:  # New version
+
+        image_isolate = isolate_salamander(image)
+
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        _, image_th_mean, _ = generate_thresholds(image)
 
     # Cropping the image.
     image_crop_original_size = crop_detailed_image_original_size(image_th_mean, image_isolate)
@@ -384,7 +400,7 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
                 min_threshold_percentage = 15
                 max_threshold_percentage = 45
                 threshold_percentage = min_threshold_percentage + weight * (
-                            max_threshold_percentage - min_threshold_percentage)
+                        max_threshold_percentage - min_threshold_percentage)
 
                 # Try to compute how much black is around the dots.
                 # Do this by making a new bigger circle, around the existing one, thus we also will make two masks.
@@ -452,22 +468,32 @@ def display_matrix(matrix):
     plt.show()
 
 
+year = '2024'
+
 if __name__ == '__main__':
-    for edited_salamander in filenames_from_folder(f'{path}'):  # Looping over all edited folders.
-        for number in filenames_from_folder(f'{path}/{edited_salamander}'):  # Looping over all edited salamanders.
+    for sal in filenames_from_folder(
+            f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/'):  # Looping over all salamanders.
+        img = wrapped_imread(
+            f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
 
-            """ Loading in the image."""
-            img = wrapped_imread(f'{path}/{edited_salamander}/{number}')
-            img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # Grayscale is important!
+        img_isolate_new = isolate_salamander(img)
+        cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750))
+        cv.waitKey()
+        cv.destroyAllWindows()
 
-            """ Generating different thresholds. """
-            th_global, th_mean, th_Gaussian = generate_thresholds(img)
-            # plotting_images(img, th_global, th_mean, th_Gaussian)
-            # cv.imshow('Gaussian Thresholding', th_Gaussian)
-            # cv.imshow('Global Thresholding', th_global)
-            # cv.imshow('Median Thresholding', th_mean)
-            # cv.waitKey(0)
-            # cv.destroyAllWindows()
+        """ Loading in the image."""
+        img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # Grayscale is important!
+
+        """ Generating different thresholds. """
+        th_global, th_mean, th_Gaussian = generate_thresholds(img)
+        # plotting_images(img, th_global, th_mean, th_Gaussian)
+        # cv.imshow('Gaussian Thresholding', th_Gaussian)
+        # cv.imshow('Global Thresholding', th_global)
+        # cv.imshow('Median Thresholding', th_mean)
+        # cv.waitKey(0)
+        # cv.destroyAllWindows()
+
+        if not old_new:  # Old version
 
             """ Pre-processing of the image. ksize = 7 is found experimentally."""
             img_blur = pre_processing(img, 7, None, True)
@@ -481,27 +507,29 @@ if __name__ == '__main__':
             cv.waitKey(0)
             cv.destroyAllWindows()
 
-            """ Cropping the image."""
-            img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
-            cv.imshow('Cropped_original_size', img_crop_original_size)
-            img_crop = crop_detailed_image_small_size(img_crop_original_size)
-            cv.waitKey()
-            cv.imshow('Cropped', img_crop)
+        else:  # New version
+            isolate_img = cv.cvtColor(img_isolate_new, cv.COLOR_BGR2GRAY)
 
-            """ Post-processing of the image."""
-            img_post_proc = post_processing(img_crop, 5, 180)
-            cv.imshow('Image post-processing', img_post_proc)
+        """ Cropping the image."""
+        img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
+        cv.imshow('Cropped_original_size', img_crop_original_size)
+        img_crop = crop_detailed_image_small_size(img_crop_original_size)
+        cv.waitKey()
+        cv.imshow('Cropped', img_crop)
 
-            """ Detecting the dots."""
-            dots = detect_dots(img_post_proc)
-            img_dots = draw_dots(img_crop, dots)
-            cv.imshow('Dots', img_dots)
+        """ Post-processing of the image."""
+        img_post_proc = post_processing(img_crop, 5, 180)
+        cv.imshow('Image post-processing', img_post_proc)
 
-            """ Representing the good dots in a matrix and showing this matrix."""
-            matrix_with_dots = image_to_matrix(img_dots, dots)
-            display_matrix(matrix_with_dots)
+        """ Detecting the dots."""
+        dots = detect_dots(img_post_proc)
+        img_dots = draw_dots(img_crop, dots)
+        cv.imshow('Dots', img_dots)
 
-            cv.waitKey(0)
-            cv.destroyAllWindows()
+        """ Representing the good dots in a matrix and showing this matrix."""
+        matrix_with_dots = image_to_matrix(img_dots, dots)
+        display_matrix(matrix_with_dots)
 
-            break
+        cv.waitKey(0)
+        cv.destroyAllWindows()
+        

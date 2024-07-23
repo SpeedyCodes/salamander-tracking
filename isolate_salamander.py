@@ -1,0 +1,322 @@
+""" Rune De Coninck
+
+Given a picture, this document will try to isolate the salamander from the background.
+Hence, it will return a new image, without minimal background and as much of the salamander.
+We will commence by using color segmentation and morphological operations to detect the salamander.
+After that, we will try to remove some parts of the background.
+"""
+
+import cv2 as cv
+import numpy as np
+
+
+def isolate_salamander(image: np.array) -> np.array:
+    """ This function will include a bunch of other functions, it will return a black image with only the salamander.
+
+    INPUT: numpy array image, this must! be in BGR format, this type of image can be obtained by wrapped_imread.
+    OUTPUT: numpy array image."""
+
+    # First, detect the salamander (and mask) with color segmentation, thus there will be some noise left.
+    image_isolated_salamander_with_noise, mask = color_segmentation(image)
+
+    # Second, try to filter out the noise based on the fact that the contour of the salamander is a big central object.
+    image_contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+    height, width = image.shape[:2]
+    central_x = width // 2
+    central_y = height // 2
+
+    # Filter the detected contours and find the one of the salamander.
+    filtered_contours, contour_with_largest_area = filter_contours(image_contours, width, height,
+                                                                   parameter_for_central_radius=4,
+                                                                   central_x=central_x, central_y=central_y)
+    best_contour = select_best_contour(filtered_contours, central_x, central_y, contour_with_largest_area)
+
+    # Only use the best contour for the final image.
+    image_isolated_salamander_without_noise = draw_best_contour(best_contour,
+                                                                image_isolated_salamander_with_noise)
+
+    return image_isolated_salamander_without_noise
+
+
+def color_segmentation(image):
+    """ Detects everything on the image that has the same color as the salamander, including the salamander."""
+
+    hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)  # Convert to HSV color space for more practical usage.
+
+    # Define colors of the salamander.
+    lower_color = np.array([5, 50, 50])  # Lower bound in HSV values.
+    upper_color = np.array([35, 255, 255])  # Upper bound in HSV values.
+
+    mask_color = cv.inRange(hsv_image, lower_color, upper_color)
+
+    # Clean the mask:
+    mask_color = clean_mask(mask_color)
+
+    image_with_mask = cv.bitwise_and(image, image, mask=mask_color)  # Apply mask to image.
+
+    return image_with_mask, mask_color
+
+
+def clean_mask(mask):
+    """ This method cleans the mask using morphological operations."""
+
+    kernel = np.ones((5, 5), np.uint8)
+
+    mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)  # Closing some holes in the mask.
+    mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)  # Removing some small noise.
+
+    # Smooth the edges of the mask, the higher ksize, the smoother the edges.
+    mask = cv.GaussianBlur(mask, (51, 51), 0)
+
+    _, mask = cv.threshold(mask, 1, 255, cv.THRESH_BINARY)  # Making it binary again.
+
+    # If the salamander is connected to some noise, the following steps will separate the salamander and the noise.
+    kernel = np.ones((30, 30), np.uint8)
+    mask = cv.erode(mask, kernel, iterations=2)  # Separate connected components.
+    mask = cv.dilate(mask, kernel, iterations=2)  # Restore the shape of the salamander.
+
+    return mask
+
+
+def central_radius(parameter, width, height):
+    """ This function will return the length of a radius around the center of the image."""
+
+    return int(min(width, height) / parameter)
+
+
+def is_contour_close_to_edge(contour, width, height, edge_percentage=0.1, required_percentage=0.15):
+    """ Returns True if the contour is close to edge, False otherwise.
+    edge_percentage is what we call the edge, and it is the percentage with respect to the size of the image.
+    If more than required_percentage is close to edge, we will consider it close to the edge."""
+
+    edge_x = width * edge_percentage
+    edge_y = height * edge_percentage
+
+    edge_point_count = 0  # Number of points that are within the edge area.
+
+    for point in contour:
+        x, y = point[0]
+
+        if (x < edge_x or x > width - edge_x or
+                y < edge_y or y > height - edge_y):
+            edge_point_count += 1  # Since the point is in the edge.
+
+    edge_point_proportion = edge_point_count / len(contour)
+
+    return edge_point_proportion >= required_percentage
+
+
+def intersects_central_square(contour, radius, central_x, central_y):
+    """ This method checks if a contour intersects with the central part of the image.
+    It returns True if the contour intersects with the central part of the image, False otherwise."""
+
+    x, y, w, h = cv.boundingRect(contour)
+    contour_rect = (x, y, x + w, y + h)
+    square_rect = (central_x - radius, central_y - radius,
+                   central_x + radius, central_y + radius)
+
+    # Check if the bounding rectangle intersects with the central square.
+    return (not (contour_rect[2] < square_rect[0] or
+                 contour_rect[0] > square_rect[2] or
+                 contour_rect[3] < square_rect[1] or
+                 contour_rect[1] > square_rect[3]))
+
+
+def contour_perimeter(contour):
+    """ This method returns the perimeter of a contour."""
+
+    return cv.arcLength(contour, True)
+
+
+def contour_area(contour):
+    """ This method returns the area of a contour."""
+
+    return cv.contourArea(contour)
+
+
+def closest_point_to_center(contour, central_x, central_y):
+    """ This method finds the closest point to the center of the image, on a given contour."""
+
+    min_distance = float('inf')
+
+    contour = [points for sub_contour in contour for points in sub_contour]  # Flattens the list.
+    for point in contour:
+        x, y = point[0]
+        distance = np.sqrt((x - central_x) ** 2 + (y - central_y) ** 2)
+
+        if distance < min_distance:
+            min_distance = distance
+
+    return min_distance
+
+
+def filter_contours(contours, width, height, parameter_for_central_radius, central_x, central_y):
+    """ This method will filter out the bad contours and hopefully only return the contour of the salamander."""
+
+    contours = filter_contours_placement(contours, width, height, parameter_for_central_radius, central_x, central_y)
+    contours = filter_contours_concentric(contours)
+    contours, contour_with_largest_area = filter_contours_area(contours, area_ratio_threshold=0.30)
+
+    return contours, contour_with_largest_area
+
+
+def filter_contours_placement(contours, width, height, parameter_for_central_radius, central_x, central_y):
+    """ This method will first filter the contours on their placement. We only keep the contours in the center of the
+    image and not near the edge."""
+
+    radius = central_radius(parameter_for_central_radius, width, height)
+    good_contours = []
+
+    for contour in contours:
+        if intersects_central_square(contour, radius, central_x, central_y) and (not is_contour_close_to_edge(contour,
+                                                                                                              width,
+                                                                                                              height)):
+            good_contours.append(contour)
+
+    # It could be that our restrictions are too strict, then we need to increase the radius.
+    if len(good_contours) == 0:
+        p = parameter_for_central_radius
+
+        assert p > 3
+
+        radius = central_radius(1 / (p - 1), width, height)
+        for contour in contours:
+            if intersects_central_square(contour, radius, central_x, central_y) and (
+                    not is_contour_close_to_edge(contour, width, height)):
+                good_contours.append(contour)
+
+        if len(good_contours) == 0:
+            radius = central_radius(1 / (p - 2), width, height)
+            for contour in contours:
+                if intersects_central_square(contour, radius, central_x, central_y) and (
+                        not is_contour_close_to_edge(contour, width, height)):
+                    good_contours.append(contour)
+
+        # If no contours are in the middle of the image, then we need to consider all contours.
+        if len(good_contours) == 0:
+            good_contours = [c for c in contours]
+
+    return good_contours
+
+
+def filter_contours_concentric(good_contours):
+    """ Often, the salamander is put in a box, and we detect the contour of the salamander and the contour of the box.
+    In this case we will have two concentric shapes. Therefore, we will remove the biggest concentric shape,
+    if it exists. """
+
+    sorted_contours = sorted(good_contours, key=contour_perimeter, reverse=True)  # Finding the biggest one.
+    biggest = sorted_contours[0]
+
+    # Drawing an ellipse around the biggest contour. Now we just need to check if the other contours completely lie
+    # in this ellipse. If this is True, then we remove the biggest contour.
+    ellipse = cv.fitEllipse(biggest)
+    (center, axes, angle) = ellipse
+    (major_axis, minor_axis) = axes
+    (cx, cy) = center
+
+    if len(sorted_contours) > 1:
+        is_concentric = True
+    else:
+        is_concentric = False
+
+    for contour in sorted_contours[1:]:  # Do not consider the biggest contour because this would be useless.
+
+        # Check if each point in the contour is within the ellipse or not.
+        for point in contour:
+            px, py = point[0]
+
+            # First do some transformations in Euclidean space.
+            cos_angle = np.cos(np.radians(-angle))
+            sin_angle = np.sin(np.radians(-angle))
+            dx = px - cx
+            dy = py - cy
+            tx = dx * cos_angle - dy * sin_angle
+            ty = dx * sin_angle + dy * cos_angle
+
+            # Check if the point is inside the ellipse
+            if (tx ** 2) / (major_axis / 2) ** 2 + (ty ** 2) / (minor_axis / 2) ** 2 > 1:  # True if outside ellipse.
+                is_concentric = False
+                break
+
+    if is_concentric:
+        # We will now remove the biggest contour.
+        # Since contours are saved in a strange manner, we do some technical conversions to tuples.
+        contours_tuples = [tuple(map(tuple, contour.reshape(-1, 2))) for contour in good_contours]
+        contour_to_remove_tuple = tuple(map(tuple, biggest.reshape(-1, 2)))
+
+        # Now actually remove the biggest contour.
+        good_contours = [contour for contour, contour_tuple in zip(good_contours, contours_tuples)
+                         if contour_tuple != contour_to_remove_tuple]
+
+    return good_contours
+
+
+def filter_contours_area(good_contours, area_ratio_threshold=0.30):
+    """ This method will filter out the small contours, in the sense that the contours with the smallest area will
+    be removed. This is to make sure that if, for some reason, the body of the salamander is separated with for
+    example a paw or the head or the tail of the salamander, then we will remove these small parts and only focus
+    on the body of the salamander as we desire. The area_ratio_threshold parameter determines when something is
+    too small."""
+
+    if not good_contours:
+        return [], None
+
+    sorted_contours = sorted(good_contours, key=contour_area, reverse=True)
+    num_contours = len(sorted_contours)
+
+    # Only consider the top three biggest contours with respect to the area, since the salamander is a big shape.
+    largest_area = contour_area(sorted_contours[0]) if num_contours > 0 else 0
+    second_area = contour_area(sorted_contours[1]) if num_contours > 1 else 0
+    third_area = contour_area(sorted_contours[2]) if num_contours > 2 else 0
+
+    # We will only keep the contours that are not too small with respect to each other.
+    good_contours = [sorted_contours[0]]
+    # Compare second and third-largest contours with the largest contour.
+    if num_contours > 1 and second_area / largest_area >= area_ratio_threshold:
+        good_contours.append(sorted_contours[1])
+    if num_contours > 2 and third_area / largest_area >= area_ratio_threshold:
+        good_contours.append(sorted_contours[2])
+
+    return good_contours, sorted_contours[0]
+
+
+def select_best_contour(good_contours, central_x, central_y, biggest_contour):
+    """ This method selects the best contour from the remaining good contours. The method will pick the most central
+    contour since that is the most likely to be a salamander."""
+
+    if len(good_contours) > 0:
+        closest_contour = None
+        value_closest_contour = float("inf")
+
+        for contour in good_contours:
+            value_contour = closest_point_to_center(good_contours, central_x, central_y)
+
+            if value_contour < value_closest_contour:
+                closest_contour = contour
+                value_closest_contour = value_contour
+
+    else:
+        # If there are no good contours, then we just take the contour which has the largest contour.
+        closest_contour = biggest_contour
+
+    return closest_contour
+
+
+def draw_best_contour(best_contour, image):
+    """ This method will make a mask from the best contour and draw it on the original image."""
+
+    # Create a mask for the selected contour
+
+    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    cv.drawContours(mask, [best_contour], -1, [255], thickness=cv.FILLED)
+
+    # Apply additional morphological operations like before.
+    kernel = np.ones((15, 15), np.uint8)
+    mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+    mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+
+    # Apply the mask to the original image
+    image = cv.bitwise_and(image, image, mask=mask)
+
+    return image
