@@ -468,7 +468,7 @@ def display_matrix(matrix):
     plt.show()
 
 
-year = '2024'
+year = '2019'
 
 if __name__ == '__main__':
     for sal in filenames_from_folder(
@@ -478,8 +478,11 @@ if __name__ == '__main__':
 
         img_isolate_new = isolate_salamander(img)
         cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750))
-        cv.waitKey()
+        cv.waitKey(0)
         cv.destroyAllWindows()
+
+        # continue
+        # Comment for myself: !!For better detecting stips, maybe look up Blob Detection!!
 
         """ Loading in the image."""
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # Grayscale is important!
@@ -532,4 +535,3 @@ if __name__ == '__main__':
 
         cv.waitKey(0)
         cv.destroyAllWindows()
-        

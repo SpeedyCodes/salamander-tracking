@@ -17,7 +17,7 @@ def isolate_salamander(image: np.array) -> np.array:
     OUTPUT: numpy array image."""
 
     # First, detect the salamander (and mask) with color segmentation, thus there will be some noise left.
-    image_isolated_salamander_with_noise, mask = color_segmentation(image)
+    image_isolated_salamander_with_noise, mask = color_segmentation(image, ksize=51)
 
     # Second, try to filter out the noise based on the fact that the contour of the salamander is a big central object.
     image_contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
@@ -39,7 +39,7 @@ def isolate_salamander(image: np.array) -> np.array:
     return image_isolated_salamander_without_noise
 
 
-def color_segmentation(image):
+def color_segmentation(image, ksize):
     """ Detects everything on the image that has the same color as the salamander, including the salamander."""
 
     hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)  # Convert to HSV color space for more practical usage.
@@ -51,14 +51,14 @@ def color_segmentation(image):
     mask_color = cv.inRange(hsv_image, lower_color, upper_color)
 
     # Clean the mask:
-    mask_color = clean_mask(mask_color)
+    mask_color = clean_mask(mask_color, ksize)
 
     image_with_mask = cv.bitwise_and(image, image, mask=mask_color)  # Apply mask to image.
 
     return image_with_mask, mask_color
 
 
-def clean_mask(mask):
+def clean_mask(mask, ksize):
     """ This method cleans the mask using morphological operations."""
 
     kernel = np.ones((5, 5), np.uint8)
@@ -67,7 +67,7 @@ def clean_mask(mask):
     mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)  # Removing some small noise.
 
     # Smooth the edges of the mask, the higher ksize, the smoother the edges.
-    mask = cv.GaussianBlur(mask, (51, 51), 0)
+    mask = cv.GaussianBlur(mask, (ksize, ksize), 0)
 
     _, mask = cv.threshold(mask, 1, 255, cv.THRESH_BINARY)  # Making it binary again.
 
@@ -154,6 +154,7 @@ def closest_point_to_center(contour, central_x, central_y):
 def filter_contours(contours, width, height, parameter_for_central_radius, central_x, central_y):
     """ This method will filter out the bad contours and hopefully only return the contour of the salamander."""
 
+    assert len(contours) > 0, 'No contours found!'
     contours = filter_contours_placement(contours, width, height, parameter_for_central_radius, central_x, central_y)
     contours = filter_contours_concentric(contours)
     contours, contour_with_largest_area = filter_contours_area(contours, area_ratio_threshold=0.30)
@@ -210,6 +211,10 @@ def filter_contours_concentric(good_contours):
 
     # Drawing an ellipse around the biggest contour. Now we just need to check if the other contours completely lie
     # in this ellipse. If this is True, then we remove the biggest contour.
+    if len(biggest) == 4:
+        raise SystemExit('Only contour found is the trivial one, please try again with a better image!')
+
+    assert len(biggest) >= 5, 'No good contours found!'
     ellipse = cv.fitEllipse(biggest)
     (center, axes, angle) = ellipse
     (major_axis, minor_axis) = axes
