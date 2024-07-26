@@ -2,7 +2,7 @@ from typing import Tuple, List
 import numpy as np
 from Convert_image_to_stips import convert_image_to_coordinate_stips
 from dot_detection.dot_detect_haar import dot_detect_haar
-
+from math import sqrt
 
 def threshold_adapter(image: np.ndarray) -> List[Tuple[int, int, int, int]]:
     """
@@ -20,7 +20,7 @@ def threshold_adapter(image: np.ndarray) -> List[Tuple[int, int, int, int]]:
     return output
 
 
-def calculate_iou(rect1: Tuple[int, int, int, int], rect2: Tuple[int, int, int, int]) -> float:
+def iou(rect1: Tuple[int, int, int, int], rect2: Tuple[int, int, int, int]) -> float:
     """
     :param rect1: the first rectangle
     :param rect2: the second rectangle
@@ -37,22 +37,40 @@ def calculate_iou(rect1: Tuple[int, int, int, int], rect2: Tuple[int, int, int, 
 
     return intersection / union
 
-
-def dot_detect_benchmark(func, images, ground_truth) -> float:
+def rect_center_distance_measure(rect1: Tuple[int, int, int, int], rect2: Tuple[int, int, int, int]) -> float:
     """
+    :param rect1: the first rectangle
+    :param rect2: the second rectangle
+    :return: a value between 0 and 1, where 1 means the rectangles are very close and 0 means they are very far apart
+    """
+    x1, y1, width1, height1 = rect1
+    x2, y2, width2, height2 = rect2
+
+    center1 = (x1 + width1 / 2, y1 + height1 / 2)
+    center2 = (x2 + width2 / 2, y2 + height2 / 2)
+
+    distance = sqrt((center1[0] - center2[0]) ** 2 + (center1[1] - center2[1]) ** 2)
+
+    average_diagonal = (sqrt(width1 ** 2 + height1 ** 2) + sqrt(width2 ** 2 + height2 ** 2)) / 2
+
+    return max(0, (average_diagonal - distance)/average_diagonal)
+
+
+def dot_detect_benchmark(measure, func, images, ground_truth) -> float:
+    """
+    :param measure: the function to measure the similarity of two rectangles
     :param func: the function to benchmark, must take in an image and return the detected dots
     :param images: a list of images to test the function on
     :param ground_truth: a list of, for every image, a list of rectangles that contain the dots
     :return: the accuracy of the function on the images (0-1)
     """
-
-    iou_sum = 0
+    diff_sum = 0
     for index, image in enumerate(images):
         detected_dots = func(image)  # the detected dots
         real_rectangles = ground_truth[index]  # the dots marked manually
 
         if len(real_rectangles) == 0:
-            iou_sum += 1
+            diff_sum += 1
             continue
 
         # find the best matches
@@ -61,31 +79,31 @@ def dot_detect_benchmark(func, images, ground_truth) -> float:
 
         for detected_index, detected_dot in enumerate(detected_dots):
             for real_index, real_rectangle in enumerate(real_rectangles):
-                iou = calculate_iou(detected_dot, real_rectangle)
-                matches.append((iou, detected_index, real_index))
+                diff = measure(detected_dot, real_rectangle)
+                matches.append((diff, detected_index, real_index))
 
-        matches.sort(key=lambda x: x[0], reverse=True)  # sort the matches by iou in descending order
+        matches.sort(key=lambda x: x[0], reverse=True)  # sort the matches by diff in descending order
 
         detected_occupied = set()
         real_occupied = set()
-        real_ious = [0] * len(real_rectangles)
+        real_diffs = [0] * len(real_rectangles)
 
         while len(matches) > 0:
-            iou, detected_index, real_index = matches.pop(0)  # take the best match
+            diff, detected_index, real_index = matches.pop(0)  # take the best match
 
             # if the detected dot and the real rectangle are not already matched
             if detected_index not in detected_occupied and real_index not in real_occupied:
                 # mark them as matched
                 detected_occupied.add(detected_index)
                 real_occupied.add(real_index)
-                real_ious[real_index] = iou  # store the iou of the match
+                real_diffs[real_index] = diff  # store the diff of the match
 
                 if len(detected_occupied) == len(detected_dots) or len(real_occupied) == len(real_rectangles):
                     break
 
-        iou_sum += sum(real_ious) / len(real_ious)
+        diff_sum += sum(real_diffs) / len(real_diffs)
 
-    return iou_sum / len(images)
+    return diff_sum / len(images)
 
 
 if __name__ == '__main__':
@@ -96,7 +114,8 @@ if __name__ == '__main__':
 
     # load the rectangles and images from annotation file with the following format:
     # image_path amount_of_rectangles x1 y1 width1 height1 x2 y2 width2 height ...
-    with open('benchmark_anno.txt', 'r') as file:
+    #with open('benchmark_anno.txt', 'r') as file:
+    with open('training/haar_cascade/merged_annotations.txt', 'r') as file:
         for line in file:
             parts = line.split(' ')
             image = wrapped_imread(parts[0])
@@ -118,7 +137,12 @@ if __name__ == '__main__':
             rectangles.append(image_rectangles)
 
     # calculate the accuracy of the haar cascade
-    accuracy = dot_detect_benchmark(dot_detect_haar, images, rectangles)
-    print(f"Accuracy with haar cascade: {accuracy}")
-    accuracy = dot_detect_benchmark(threshold_adapter, images, rectangles)
-    print(f"Accuracy with threshold adapter: {accuracy}")
+    accuracy = dot_detect_benchmark(iou, dot_detect_haar, images, rectangles)
+    print(f"Accuracy with haar cascade according to iou: {accuracy}")
+    accuracy = dot_detect_benchmark(iou, threshold_adapter, images, rectangles)
+    print(f"Accuracy with threshold according to iou: {accuracy}")
+    accuracy = dot_detect_benchmark(rect_center_distance_measure, dot_detect_haar, images, rectangles)
+    print(f"Accuracy with haar cascade according to rect_center_distance_measure: {accuracy}")
+    accuracy = dot_detect_benchmark(rect_center_distance_measure, threshold_adapter, images, rectangles)
+    print(f"Accuracy with threshold according to rect_center_distance_measure: {accuracy}")
+    

@@ -3,4 +3,9 @@ input
 venv
 training/haar_cascade/bins
 training/haar_cascade/negative
+training/haar_cascade/neg.txt
+training/haar_cascade/merged_annotations.txt
+training/haar_cascade/positive_samples.dat
+training/haar_cascade/cascade/stage*.xml
+training/haar_cascade/cascade/params.xml
 __pycache__
