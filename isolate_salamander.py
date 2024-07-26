@@ -17,7 +17,8 @@ def isolate_salamander(image: np.array) -> np.array:
     OUTPUT: numpy array image."""
 
     # First, detect the salamander (and mask) with color segmentation, thus there will be some noise left.
-    image_isolated_salamander_with_noise, mask = color_segmentation(image, ksize=51)
+    image_isolated_salamander_with_noise, mask = color_segmentation(image, ksize=51, lower_bound=[5, 50, 50],
+                                                                    upper_bound=[35, 255, 255])
 
     # Second, try to filter out the noise based on the fact that the contour of the salamander is a big central object.
     image_contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
@@ -39,14 +40,14 @@ def isolate_salamander(image: np.array) -> np.array:
     return image_isolated_salamander_without_noise
 
 
-def color_segmentation(image, ksize):
+def color_segmentation(image, ksize, lower_bound, upper_bound):
     """ Detects everything on the image that has the same color as the salamander, including the salamander."""
 
     hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)  # Convert to HSV color space for more practical usage.
 
     # Define colors of the salamander.
-    lower_color = np.array([5, 50, 50])  # Lower bound in HSV values.
-    upper_color = np.array([35, 255, 255])  # Upper bound in HSV values.
+    lower_color = np.array(lower_bound)  # Lower bound in HSV values.
+    upper_color = np.array(upper_bound)  # Upper bound in HSV values.
 
     mask_color = cv.inRange(hsv_image, lower_color, upper_color)
 
