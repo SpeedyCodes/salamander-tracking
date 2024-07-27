@@ -368,7 +368,6 @@ def detect_dots(image, min_area=10, max_area=400, sigma_divider=6):
     # Sigma_divider is used for the Gaussian_weight function. It helps in the following manner:
     # If too many dots far from the center are classified as good, then increase the sigma_divider.
     # If too many dots near the center are classified as bad, then decrease the sigma_divider.
-
     # Output will be an image with green (good) dots and red (bad) dots.
 
     # Find contours, we use RETR_TREE for more accurate results. MAYBE CHANGE LATER.
@@ -477,17 +476,14 @@ if __name__ == '__main__':
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
 
         img_isolate_new = isolate_salamander(img)
-        cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750))
+        cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750, width=500))
         cv.waitKey(0)
-        cv.destroyAllWindows()
-
-        # continue
-        # Comment for myself: !!For better detecting stips, maybe look up Blob Detection!!
 
         """ Loading in the image."""
         img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # Grayscale is important!
 
         """ Generating different thresholds. """
+        img = pre_processing(img, 7, None, True)
         th_global, th_mean, th_Gaussian = generate_thresholds(img)
         # plotting_images(img, th_global, th_mean, th_Gaussian)
         # cv.imshow('Gaussian Thresholding', th_Gaussian)
@@ -502,11 +498,11 @@ if __name__ == '__main__':
             img_blur = pre_processing(img, 7, None, True)
             cv.imshow('Pre-processing', img_blur)
             _, img_blur_global = cv.threshold(img_blur, 110, 255, cv.THRESH_BINARY)
-            cv.imshow('Binaire', img_blur_global)
+            cv.imshow('Binaire', resize_with_aspect_ratio(img_blur_global, height=750))
 
             """ Isolating central object."""
             isolate_img = isolate_central_object(img_blur_global)
-            cv.imshow('Isolated', isolate_img)
+            cv.imshow('Isolated', resize_with_aspect_ratio(isolate_img, height=750))
             cv.waitKey(0)
             cv.destroyAllWindows()
 
@@ -515,19 +511,19 @@ if __name__ == '__main__':
 
         """ Cropping the image."""
         img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
-        cv.imshow('Cropped_original_size', img_crop_original_size)
+        cv.imshow('Cropped_original_size', resize_with_aspect_ratio(img_crop_original_size, height=750))
         img_crop = crop_detailed_image_small_size(img_crop_original_size)
         cv.waitKey()
-        cv.imshow('Cropped', img_crop)
+        cv.imshow('Cropped', resize_with_aspect_ratio(img_crop, height=750))
 
         """ Post-processing of the image."""
         img_post_proc = post_processing(img_crop, 5, 180)
-        cv.imshow('Image post-processing', img_post_proc)
+        cv.imshow('Image post-processing', resize_with_aspect_ratio(img_post_proc, height=750))
 
         """ Detecting the dots."""
         dots = detect_dots(img_post_proc)
         img_dots = draw_dots(img_crop, dots)
-        cv.imshow('Dots', img_dots)
+        cv.imshow('Dots', resize_with_aspect_ratio(img_dots, height=750, width=300))
 
         """ Representing the good dots in a matrix and showing this matrix."""
         matrix_with_dots = image_to_matrix(img_dots, dots)
