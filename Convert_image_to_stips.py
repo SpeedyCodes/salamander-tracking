@@ -314,22 +314,27 @@ def crop_detailed_image_original_size(detailed_image, surrounded_image):
     return cropped_image_original_size
 
 
-def crop_detailed_image_small_size(cropped_image_original_size):
+def crop_detailed_image_small_size(cropped_image_original_size, reverse_colors=True):
     """ This method will literally crop the cropped image. So we remove the non-interesting, white background that we
     have created in the method crop_detailed_image_original_size. We return an image with smaller size than the original
-    image, but this smaller image only contains key information of the salamander, no extra white background."""
+    image, but this smaller image only contains key information of the salamander, no extra white background.
+
+    Note: if you work with a black background, just put reverse_colors on False and the algorithm will keep working."""
 
     # We will first need to find the bounding box of the middle shape.
-    # To be able to do this, we first need to change white to black and black to white.
-    cropped_image_original_size = cv.bitwise_not(cropped_image_original_size)
+
+    if reverse_colors:
+        # To be able to do this, we first need to change white to black and black to white.
+        cropped_image_original_size = cv.bitwise_not(cropped_image_original_size)
 
     x, y, w, h = cv.boundingRect(cropped_image_original_size)
 
     # Now crop the image to the bounding box.
-    cropped_image = cropped_image_original_size[y:y + h, x:x + w]
+    cropped_image = cropped_image_original_size[y - 1: y + h + 1, x - 1: x + w + 1]
 
-    # Again reverse the colors back to what we are used to.
-    cropped_image = cv.bitwise_not(cropped_image)
+    if reverse_colors:
+        # Again reverse the colors back to what we are used to.
+        cropped_image = cv.bitwise_not(cropped_image)
 
     return cropped_image
 
@@ -474,6 +479,9 @@ if __name__ == '__main__':
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/'):  # Looping over all salamanders.
         img = wrapped_imread(
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
+
+        cv.imshow('original', img)
+        cv.waitKey()
 
         img_isolate_new = isolate_salamander(img)
         cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750, width=500))
