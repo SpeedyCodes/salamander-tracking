@@ -11,22 +11,25 @@ This is done in several steps:
 0. Loading in the list of coordinates/points.
 1. Check if the number of coordinates/points is approximately equal.
 2. Selecting the points to be matched.
-3. [NOT DONE YET] Generating lists of triangles.
-4. [NOT DONE YET] Filtering the triangles.
-5. [NOT DONE YET] Matching the triangles.
-6. [NOT DONE YET] Reducing the number of false matches.
-7. [NOT DONE YET] Assigning matched points.
-8. [NOT DONE YET] Protecting against spurious assignments.
+3. Generating lists of triangles.
+4. [NOT DONE YET] Matching the triangles.
+5. [NOT DONE YET] Reducing the number of false matches.
+6. [NOT DONE YET] Assigning matched points.
+7. [NOT DONE YET] Protecting against spurious assignments.
 """
 
 from dot_detection.dot_detect_haar import dot_detect_haar
 from Convert_image_to_stips import crop_detailed_image_small_size
+from isolate_salamander import isolate_salamander
+import cv2 as cv
 import numpy as np
+import matplotlib.pyplot as plt
 import math
 import itertools
 
 
-def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]], tol: float = 0.001):
+def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]], tol: float = 0.001,
+                         plot_r_values: bool = False):
     """ This function will include a bunch of other functions ...
 
     INPUT: image denotes the unknown image, this is the image we want to compare with our database.
@@ -34,14 +37,24 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
     INPUT: the tolerance tol is a parameter that the user is free to set. If detected dots have distance less than
     a scaler multiplied by tol, then we consider these dots as one. (We remove one of the two dots, this ensures that
     the numerical computations are stable).
+    INPUT: plot_r_values is a boolean that determines whether to plot the r_values in a histogram.
     OUTPUT: """
 
     # First, crop the image to the essential part.
+    image = isolate_salamander(image)
+    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     image = crop_detailed_image_small_size(image, reverse_colors=False)
 
     # Second, load in the list of coordinates of the unknown image and select the points to be used.
     list_coordinates = load_in_coordinates(image)
-    list_coordinates = select_points_to_be_matched(list_coordinates, tol=3*tol)
+    list_coordinates = select_points_to_be_matched(list_coordinates, tol=3 * tol)
+    # Generate a list of triangles and some extra information.
+    list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=10)  # We have found R_max by
+    # experimentally looking at the histogram with R-values.
+
+    if plot_r_values:
+        # Plotting the histogram of r_values.
+        histogram_r_values(r_values)
 
     # Then, transform the database of images to a database of lists of coordinates with a name tag.
     database_of_coordinates = set()  # type = set[ list[ set[tuple[float, float] ], str ].
@@ -50,7 +63,7 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
     for image_database, name_image_database in database:
         image_database = crop_detailed_image_small_size(image_database, reverse_colors=False)
         list_coordinates_image_database = load_in_coordinates(image_database)
-        list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3*tol)
+        list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3 * tol)
         database_of_coordinates.add([list_coordinates_image_database, name_image_database])
 
     # Now start the matching procedure.
@@ -59,6 +72,9 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
         # Check the number of detected points.
         if not check_number_of_points(list_coordinates, list_coordinates_image_database):
             continue  # This is not a match, go to the next pattern in the database.
+
+        # Make a new list with a lot of triangles and some extra information.
+        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=10)
 
     return None
 
@@ -79,7 +95,7 @@ def normalisation_of_coordinates(x, y, width_image, height_image):
     """ This method normalizes the coordinates of a rectangle to the [0, 1] interval,
     given that the origin is at the top left."""
 
-    return x/width_image, y/height_image
+    return x / width_image, y / height_image
 
 
 def transform_origin(x, y):
@@ -103,6 +119,7 @@ def load_in_coordinates(image) -> set[tuple[float, float]]:
     # of the image. (x, y) denotes the upper left coordinate of the rectangle. Width and height respectively denote
     # the length of the side of the rectangle, starting from the (x, y) coordinate, in x and y direction.
     list_haar_cascade = dot_detect_haar(image)
+    assert len(list_haar_cascade) > 0, 'No dots detected :('
 
     for (x, y, w, h) in list_haar_cascade:
         # First, we try to detect the center of the rectangle in the given coordinate system.
@@ -155,26 +172,111 @@ def check_number_of_points(list_coordinates1, list_coordinates2, tol: int = 5):
     return abs(len(list_coordinates1) - len(list_coordinates2)) <= tol
 
 
-""" STEP 3: Generating lists of triangles."""
+""" STEP 3: Generating lists of triangles. """
 
 
-def generate_triangles(list_coordinates):
+def orientation_triangle(vertex1, vertex2, vertex3) -> str:
+    """ Determines the orientation of a triangle, it determines in which way we can traverse through vertex1,
+    vertex2, and vertex3. This is based on the Shoelace formula."""
+    (x1, y1) = vertex1
+    (x2, y2) = vertex2
+    (x3, y3) = vertex3
+
+    A = (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
+
+    if A > 0:
+        return "Counter-clockwise"
+    elif A < 0:
+        return "Clockwise"
+    else:
+        return "Collinear"
+
+
+def generate_list_triangles(list_coordinates, tol, R_max):
     """ This method will generate all possible triangles between every three distinct points in the list of coordinates.
     We return a big list of all the triangles and extra info such as ratio of sides, perimeter, orientation,
     different tolerances, cosine of a certain angle. Detailed info can be found in this code as comments."""
 
     list_triangles = set()
-    NOG NIET AF
-    # First create all possible triangles between every three points in the list of coordinates.
-    triangles = []
+    r_values = []
 
-    # Generate all the combinations of three distinct points.
-    for point1, point2, point3 in itertools.combinations(list_coordinates, 3):
+    """First create all possible triangles between every three points in the list of coordinates."""
+    for temp1, temp2, temp3 in itertools.combinations(list_coordinates, 3):
         # Calculate the lengths of the sides of the triangle
-        side1 = math.dist(point1, point2)
-        side2 = math.dist(point2, point3)
-        side3 = math.dist(point3, point1)
+        temp12 = math.dist(temp1, temp2)
+        temp23 = math.dist(temp2, temp3)
+        temp31 = math.dist(temp3, temp1)
 
-        triangles.append(((point1, point2, point3), (side1, side2, side3)))
+        """ Second, we want to organize the vertices ( = points) and the lengths of the sides in the following way.
+        We name the vertices and sides such that the following holds:
+        The shortest side is defined to lie between vertices 1 and 2, the intermediate side between vertices 2 and 3,
+        and the longest side between vertices 1 and 3. """
 
-    return triangles
+        sides = [(temp12, (temp1, temp2)), (temp23, (temp2, temp3)), (temp31, (temp3, temp1))]
+        sides.sort()  # Sort the sides such that the smallest side is the first element.
+        shortest_side, intermediate_side, longest_side = sides
+
+        # Shortest side must be between vertex 1 and 2.
+        vertex1, vertex2 = shortest_side[1]
+
+        # Longest side must be between vertex 1 and 3, so we need to swap if needed.
+        if vertex1 not in longest_side[1]:
+            vertex1, vertex2 = vertex2, vertex1
+
+        # Assign vertex 3 to the remaining point.
+        vertex3 = next(vertex for vertex in [temp1, temp2, temp3] if vertex not in (vertex1, vertex2))
+
+        # Ensure the longest side is between vertex1 and vertex3, otherwise swap the vertices.
+        if (vertex1, vertex3) != longest_side[1] and (vertex3, vertex1) != longest_side[1]:
+            vertex2, vertex3 = vertex3, vertex2
+
+        """ Third, we compute a lot of information about the vertices and sides. """
+        # Coordinates of the vertices.
+        (x1, y1) = vertex1
+        (x2, y2) = vertex2
+        (x3, y3) = vertex3
+
+        # Orientation of the triangle, how can we traverse through vertex1, vertex2 and vertex3.
+        orientation = orientation_triangle(vertex1, vertex2, vertex3)
+        if orientation == 'Collinear':
+            continue  # Since this will not be a triangle.
+
+        # Ratio of the longest to the shortest side.
+        r2 = shortest_side[0]
+        r3 = longest_side[0]
+        R = r3 / r2
+        if R > R_max:
+            continue  # Since otherwise, this will result in triangles with to big tol_r and hence they will match
+            # with a lot of triangles that are not supposed to be matches.
+
+        # With r_values, we can see how the R values are distributed.
+        r_values.append(R)
+
+        # Sine and Cosine of the angle at vertex 1.
+        S = (1 / (r3 * r2)) * ((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))
+        C = (1 / (r3 * r2)) * ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1))
+
+        # Tolerances in R and C.
+        F = (tol ** 2) * ((1 / (r3 ** 2)) - (C / (r3 * r2)) + (1 / (r2 ** 2)))
+        tol_r = math.sqrt(2 * R * R * F)
+        tol_c = math.sqrt(2 * S * S * F + 3 * C * C * F * F)
+
+        # Logarithm of the perimeter.
+        log_p = math.log(shortest_side[0] + intermediate_side[0] + longest_side[0])
+
+        """ Fourth, add the information to list_triangles. """
+        list_triangles.add(((vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation))
+
+    return list_triangles, r_values
+
+
+def histogram_r_values(r_values):
+    """ This method generates a histogram of the r_values. """
+
+    plt.figure(figsize=(8, 6))
+    plt.hist(r_values, bins=30, color='blue', edgecolor='black', alpha=0.7)
+    plt.title('Distribution of R Values')
+    plt.xlabel('R Value')
+    plt.ylabel('Frequency')
+    plt.grid(True)
+    plt.show()
