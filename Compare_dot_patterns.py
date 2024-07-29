@@ -12,7 +12,7 @@ This is done in several steps:
 1. Check if the number of coordinates/points is approximately equal.
 2. Selecting the points to be matched.
 3. Generating lists of triangles.
-4. [NOT DONE YET] Matching the triangles.
+4. Matching the triangles.
 5. [NOT DONE YET] Reducing the number of false matches.
 6. [NOT DONE YET] Assigning matched points.
 7. [NOT DONE YET] Protecting against spurious assignments.
@@ -49,7 +49,7 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
     list_coordinates = load_in_coordinates(image)
     list_coordinates = select_points_to_be_matched(list_coordinates, tol=3 * tol)
     # Generate a list of triangles and some extra information.
-    list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=10)  # We have found R_max by
+    list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=8)  # We have found R_max by
     # experimentally looking at the histogram with R-values.
 
     if plot_r_values:
@@ -74,7 +74,9 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
             continue  # This is not a match, go to the next pattern in the database.
 
         # Make a new list with a lot of triangles and some extra information.
-        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=10)
+        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=8)
+
+        matches = matching_triangles(list_triangles, list_triangles_database)
 
     return None
 
@@ -110,7 +112,7 @@ def load_in_coordinates(image) -> set[tuple[float, float]]:
     We extract the centroid of this input and also normalize the coordinates to the [0, 1] interval.
     Furthermore, we use a new origin, located at the bottom left of the image."""
 
-    width_image, height_image = image.shape
+    height_image, width_image = image.shape
 
     list_coordinates = set()
 
@@ -195,9 +197,11 @@ def orientation_triangle(vertex1, vertex2, vertex3) -> str:
 def generate_list_triangles(list_coordinates, tol, R_max):
     """ This method will generate all possible triangles between every three distinct points in the list of coordinates.
     We return a big list of all the triangles and extra info such as ratio of sides, perimeter, orientation,
-    different tolerances, cosine of a certain angle. Detailed info can be found in this code as comments."""
+    different tolerances, cosine of a certain angle. Detailed info can be found in this code as comments.
 
-    list_triangles = set()
+    OUTPUT list_triangles: [ ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ) ]. """
+
+    list_triangles = []
     r_values = []
 
     """First create all possible triangles between every three points in the list of coordinates."""
@@ -265,7 +269,7 @@ def generate_list_triangles(list_coordinates, tol, R_max):
         log_p = math.log(shortest_side[0] + intermediate_side[0] + longest_side[0])
 
         """ Fourth, add the information to list_triangles. """
-        list_triangles.add(((vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation))
+        list_triangles.append(((vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation))
 
     return list_triangles, r_values
 
@@ -280,3 +284,70 @@ def histogram_r_values(r_values):
     plt.ylabel('Frequency')
     plt.grid(True)
     plt.show()
+
+    return None
+
+
+""" STEP 4: Matching the triangles. """
+
+
+def is_possible_match(triangle1, triangle2) -> bool:
+    """ This method returns True if there could be a potential match between the two triangles. Otherwise, it will
+    return False. We use the fact that similar triangles (up to orientation) are uniquely determined by a length ratio R
+    and the cosine of an angle C. We use the tolerances computed in step 3."""
+
+    (_, R_a, C_a, tol_r_a, tol_c_a, _, _) = triangle1
+    (_, R_b, C_b, tol_r_b, tol_c_b, _, _) = triangle2
+
+    check1 = (R_a - R_b) ** 2 < (tol_r_a ** 2) + (tol_r_b ** 2)
+    check2 = (C_a - C_b) ** 2 < (tol_c_a ** 2) + (tol_c_b ** 2)
+
+    return check1 and check2
+
+
+def matching_triangles(list_triangles1, list_triangles2):
+    """ This method tries to find a match between two lists of triangles. Essentially we can just compare all the
+    triangles of both lists and use is_possible_match on them, but for optimal computational time, we will do something
+    like a merge sort. By sorting the lists and using tolerance ranges, we significantly reduce the number of
+    comparisons compared to a brute force approach. Instead of checking all pairs, we only check triangles within a
+    specific range, guided by the maximum tolerances.
+
+    INPUT: list_triangles1: this is the list of triangles, determined by the unknown image.
+    INPUT: list_triangles2: this is the list of triangles, determined by some image from our database.
+
+    CONTENT: list_triangles: [ ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ) ] """
+
+    # First sort the two lists, based on increasing R values.
+    list_triangles1.sort(key=lambda x: x[1])
+    list_triangles2.sort(key=lambda x: x[1])
+
+    # Finding the maximal tol_r for both lists.
+    max_tol_r_a = max(list_triangles1, key=lambda x: x[3])
+    max_tol_r_b = max(list_triangles2, key=lambda x: x[3])
+
+    matches = []
+    # We iterate over list 2 with variable j, variable "i" also iterates over list 2, but it finds the lower bound.
+    # Then the parameter j will start at this lower bound and end at an upper bound. This prevents brute force
+    # calculation and allows us to only compare a few of the triangles.
+    i = 0
+
+    for triangle1 in list_triangles1:
+        R_a = triangle1[1]
+
+        # Determine the range of indices in list 2 to consider, the bounds are found by using the triangle inequality at
+        # the conditions of the function is_possible_match.
+        while i < len(list_triangles2) and list_triangles2[i][1] < R_a - (max_tol_r_a + max_tol_r_b):
+            i += 1
+
+        j = i  # Start at the lower bound.
+
+        while j < len(list_triangles2) and list_triangles2[j][1] <= R_a + (max_tol_r_a + max_tol_r_b):
+            triangle2 = list_triangles2[j]
+
+            # Check if this pair of triangles match.
+            if is_possible_match(triangle1, triangle2):
+                matches.append((triangle1, triangle2))
+
+            j += 1
+
+    return matches
