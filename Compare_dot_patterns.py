@@ -13,7 +13,7 @@ This is done in several steps:
 2. Selecting the points to be matched.
 3. Generating lists of triangles.
 4. Matching the triangles.
-5. [NOT DONE YET] Reducing the number of false matches.
+5. Reducing the number of false matches.
 6. [NOT DONE YET] Assigning matched points.
 7. [NOT DONE YET] Protecting against spurious assignments.
 """
@@ -26,6 +26,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import itertools
+import copy
 
 
 def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]], tol: float = 0.001,
@@ -49,8 +50,8 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
     list_coordinates = load_in_coordinates(image)
     list_coordinates = select_points_to_be_matched(list_coordinates, tol=3 * tol)
     # Generate a list of triangles and some extra information.
-    list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=8)  # We have found R_max by
-    # experimentally looking at the histogram with R-values.
+    list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=8, C_max=0.99, s_max=0.85)
+    # We have found R_max by experimentally looking at the histogram with R-values.
 
     if plot_r_values:
         # Plotting the histogram of r_values.
@@ -74,9 +75,14 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
             continue  # This is not a match, go to the next pattern in the database.
 
         # Make a new list with a lot of triangles and some extra information.
-        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=8)
+        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=8, C_max=0.99,
+                                                             s_max=0.85)
 
+        # Calculating matches.
         matches = matching_triangles(list_triangles, list_triangles_database)
+
+        # Reducing false matches.
+        matches = reduce_false_matches(matches)
 
     return None
 
@@ -194,24 +200,38 @@ def orientation_triangle(vertex1, vertex2, vertex3) -> str:
         return "Collinear"
 
 
-def generate_list_triangles(list_coordinates, tol, R_max):
+def generate_list_triangles(list_coordinates, tol, R_max, C_max, s_max):
     """ This method will generate all possible triangles between every three distinct points in the list of coordinates.
     We return a big list of all the triangles and extra info such as ratio of sides, perimeter, orientation,
     different tolerances, cosine of a certain angle. Detailed info can be found in this code as comments.
 
     OUTPUT list_triangles: [ ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ) ]. """
 
-    list_triangles = []
-    r_values = []
+    """ First try to compute r3_max, this is the biggest side of all possible triangles, we do this by creating all 
+    possible triangles between every three points in the list of coordinates. """
+    temp_data = []
+    r3_max = 0
 
-    """First create all possible triangles between every three points in the list of coordinates."""
     for temp1, temp2, temp3 in itertools.combinations(list_coordinates, 3):
         # Calculate the lengths of the sides of the triangle
         temp12 = math.dist(temp1, temp2)
         temp23 = math.dist(temp2, temp3)
         temp31 = math.dist(temp3, temp1)
 
-        """ Second, we want to organize the vertices ( = points) and the lengths of the sides in the following way.
+        longest_side_length = max(temp12, temp23, temp31)
+
+        if longest_side_length > r3_max:
+            r3_max = longest_side_length
+
+        temp_data.append((temp1, temp2, temp3, temp12, temp23, temp31))
+
+    list_triangles = []
+    r_values = []
+
+    """ Second, collect the data from the first step."""
+    for temp1, temp2, temp3, temp12, temp23, temp31 in temp_data:
+
+        """ Third, we want to organize the vertices ( = points) and the lengths of the sides in the following way.
         We name the vertices and sides such that the following holds:
         The shortest side is defined to lie between vertices 1 and 2, the intermediate side between vertices 2 and 3,
         and the longest side between vertices 1 and 3. """
@@ -219,6 +239,11 @@ def generate_list_triangles(list_coordinates, tol, R_max):
         sides = [(temp12, (temp1, temp2)), (temp23, (temp2, temp3)), (temp31, (temp3, temp1))]
         sides.sort()  # Sort the sides such that the smallest side is the first element.
         shortest_side, intermediate_side, longest_side = sides
+
+        # Update r3_max to the current longest side if it's larger.
+        r3 = longest_side[0]
+        if r3 > r3_max:
+            r3_max = r3
 
         # Shortest side must be between vertex 1 and 2.
         vertex1, vertex2 = shortest_side[1]
@@ -234,7 +259,7 @@ def generate_list_triangles(list_coordinates, tol, R_max):
         if (vertex1, vertex3) != longest_side[1] and (vertex3, vertex1) != longest_side[1]:
             vertex2, vertex3 = vertex3, vertex2
 
-        """ Third, we compute a lot of information about the vertices and sides. """
+        """ Fourth, we compute a lot of information about the vertices and sides. """
         # Coordinates of the vertices.
         (x1, y1) = vertex1
         (x2, y2) = vertex2
@@ -256,9 +281,18 @@ def generate_list_triangles(list_coordinates, tol, R_max):
         # With r_values, we can see how the R values are distributed.
         r_values.append(R)
 
+        # Ratio of the longest side to the maximum of the longest sides.
+        s = r3 / r3_max
+        if s > s_max:
+            continue  # Image quality and projection effect distortion are largest for the big triangles.
+            # This gives more problems when trying to match the triangles.
+
         # Sine and Cosine of the angle at vertex 1.
-        S = (1 / (r3 * r2)) * ((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))
         C = (1 / (r3 * r2)) * ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1))
+        if C > C_max:
+            continue  # In this case, the triangle will almost be a line and thus, our algorithm will be more
+            # susceptible to generate false matches between all of these kind of "fake triangles".
+        S = (1 / (r3 * r2)) * ((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))
 
         # Tolerances in R and C.
         F = (tol ** 2) * ((1 / (r3 ** 2)) - (C / (r3 * r2)) + (1 / (r2 ** 2)))
@@ -268,7 +302,7 @@ def generate_list_triangles(list_coordinates, tol, R_max):
         # Logarithm of the perimeter.
         log_p = math.log(shortest_side[0] + intermediate_side[0] + longest_side[0])
 
-        """ Fourth, add the information to list_triangles. """
+        """ Fifth, add the information to list_triangles. """
         list_triangles.append(((vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation))
 
     return list_triangles, r_values
@@ -341,13 +375,129 @@ def matching_triangles(list_triangles1, list_triangles2):
 
         j = i  # Start at the lower bound.
 
+        # Temporary list to store possible matches for the current triangle from list 1
+        potential_matches = []
+
         while j < len(list_triangles2) and list_triangles2[j][1] <= R_a + (max_tol_r_a + max_tol_r_b):
             triangle2 = list_triangles2[j]
 
             # Check if this pair of triangles match.
             if is_possible_match(triangle1, triangle2):
-                matches.append((triangle1, triangle2))
+                potential_matches.append((triangle1, triangle2))
 
             j += 1
 
+        # If there are any potential matches, find the closest one based on check1 criteria from the previous method.
+        # This ensures that we have at most one match for every triangle of list 1.
+        if potential_matches:
+            best_match = min(potential_matches, key=lambda x: (triangle1[1] - x[1]) ** 2)
+            matches.append((triangle1, best_match))
+
     return matches
+
+
+""" STEP 5: Reducing the number of false matches. """
+
+
+def compute_extra_info_for_matches(matches):
+    """ This method calculates the logarithm of the magnification factor M and the same- or opposite-sense variable
+    (triangles or same sense if they are both the same oriented, otherwise they are opposite-sense) for each match.
+    Then it returns the matches, including the extra info for every match.
+
+    INPUT: a match is a tuple of two triangles, such a triangle is the following:
+    ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation )."""
+
+    matches_extra_info = []
+
+    for (triangle1, triangle2) in matches:
+        log_p1 = triangle1[5]
+        log_p2 = triangle2[5]
+
+        log_M = log_p1 - log_p2  # M is the magnification factor between the triangles (the scaling for in- and
+        # out zooming).
+
+        if triangle1[6] == triangle2[6]:  # Compare the orientation of the triangles.
+            sense = 'same'
+        else:
+            sense = 'opposite'
+
+        matches_extra_info.append((triangle1, triangle2, log_M, sense))
+
+    return matches_extra_info
+
+
+def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, factor: float = 0.1):
+    """ This method reduces the number of false matches based on the logarithm of the magnification factor M,
+    its distribution and the orientation of the triangles."""
+
+    """ First, calculate the logarithm of the magnification factor M and the same- or opposite-sense variable 
+    (triangles or same sense if they are both the same oriented, otherwise they are opposite-sense) for each match."""
+
+    matches = compute_extra_info_for_matches(matches)
+
+    """ matches is of the following type:
+    (triangle1, triangle2, log_M, sense), where a triangle is of the following type:
+    ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ). """
+
+    """ Second, we will do some iterations to filter the matches, based on the log_M values.
+    We can do this since all the true matches will have approximately the same log_M, while the false
+    matches will have distinct log_M values."""
+
+    is_match_discarded = True
+    iteration = 0
+
+    if len(matches) == 0:
+        return matches
+
+    while is_match_discarded and iteration < iteration_limit and len(matches) > 0:
+
+        # Do some initialising calculations:
+        log_M_list = [x[2] for x in matches]
+
+        n_plus = sum(1 for _, _, _, sense in matches if sense == 'same')  # Number of same senses.
+        n_minus = sum(1 for _, _, _, sense in matches if sense == 'opposite')  # Number of opposite senses.
+
+        m_true = abs(n_plus - n_minus)  # Estimate number of true matches.
+        m_false = n_plus + n_minus - m_true  # Estimate number of false matches.
+
+        mean_log_M = np.mean(log_M_list)
+        std_dev_log_M = np.std(log_M_list)
+
+        if m_false > m_true:
+            scaler = 1
+        elif factor * m_true > m_false:
+            scaler = 3
+        else:
+            scaler = 2
+
+        is_match_discarded = False
+        matches_copy = []
+
+        # Only keep the matches that are close to the mean of log_M, this ensures we keep the true matches.
+        for (triangle1, triangle2, log_M, sense) in matches:
+            if abs(log_M - mean_log_M) <= scaler * std_dev_log_M:
+                matches_copy.append((triangle1, triangle2, log_M, sense))
+            else:
+                is_match_discarded = True
+
+        matches = copy.deepcopy(matches_copy)
+        iteration += 1
+
+    """ Third, we filter on the sense values. So after the iterative proces from the previous step, 
+    we know only keep the matches that have same or opposite sense, based on which version is the most common."""
+
+    n_plus = sum(1 for _, _, _, sense in matches if sense == 'same')  # Number of same senses.
+    n_minus = sum(1 for _, _, _, sense in matches if sense == 'opposite')  # Number of opposite senses.
+
+    matches_copy = []
+
+    if n_plus >= n_minus:
+        remove_matches = 'opposite'
+    else:
+        remove_matches = 'same'
+
+    for (triangle1, triangle2, log_M, sense) in matches:
+        if sense != remove_matches:
+            matches_copy.append((triangle1, triangle2, log_M, sense))
+
+    return matches_copy
