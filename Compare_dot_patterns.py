@@ -14,7 +14,7 @@ This is done in several steps:
 3. Generating lists of triangles.
 4. Matching the triangles.
 5. Reducing the number of false matches.
-6. [NOT DONE YET] Assigning matched points.
+6. Assigning matched points through voting.
 7. [NOT DONE YET] Protecting against spurious assignments.
 """
 
@@ -501,3 +501,65 @@ def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, facto
             matches_copy.append((triangle1, triangle2, log_M, sense))
 
     return matches_copy
+
+
+""" STEP 6: Assigning matched points through voting. """
+
+
+def assign_matched_points(matches: list[tuple]):
+    """ This method assigns points to each other using a voting system. For every matching two triangles, we cast
+    three votes for the corresponding vertices. Then we only keep the most frequent votes and these are most likely
+    true matching points."""
+
+    if len(matches) == 0:
+        return matches
+
+    # First cast all the votes for every matching triangle.
+    voting_dict = dict()
+    for triangle1, triangle2, _, _ in matches:
+        (vertex11, vertex12, vertex13), _, _, _, _, _, _ = triangle1
+        (vertex21, vertex22, vertex23), _, _, _, _, _, _ = triangle2
+
+        if (vertex11, vertex21) not in voting_dict.keys():
+            voting_dict[(vertex11, vertex21)] = 1
+        else:
+            voting_dict[(vertex11, vertex21)] += 1
+
+        if (vertex12, vertex22) not in voting_dict.keys():
+            voting_dict[(vertex12, vertex22)] = 1
+        else:
+            voting_dict[(vertex11, vertex22)] += 1
+
+        if (vertex13, vertex23) not in voting_dict.keys():
+            voting_dict[(vertex13, vertex23)] = 1
+        else:
+            voting_dict[(vertex13, vertex23)] += 1
+
+    # Convert the dictionary to a list and sort the votes in decreasing order.
+    voting_list = list(voting_dict.items())
+    """ Voting list is of the form [ ( (vertex, vertex), vote ), ... ]"""
+    voting_list = sorted(voting_list, key=lambda item: item[1], reverse=True)
+
+    nr_of_most_votes = voting_list[0][1]
+    threshold_for_nr_of_votes = nr_of_most_votes // 2  # We stop if the number of votes drops by a factor of 2.
+    if nr_of_most_votes <= 1:
+        return []  # In this case, there is no match, so we just return an empty list.
+
+    # Storage the matching pairs of points.
+    matching_points = []
+    used_points = set()
+
+    for (point1, point2), nr_of_votes in voting_list:
+
+        # Check if the current pair is still valid.
+        if nr_of_votes < threshold_for_nr_of_votes:
+            break
+
+        if point1 in used_points or point2 in used_points:
+            continue  # Since we already have a better match at this point in our matching points list.
+
+        matching_points.append((point1, point2))
+        used_points.add(point1)
+        used_points.add(point2)
+
+    return matching_points
