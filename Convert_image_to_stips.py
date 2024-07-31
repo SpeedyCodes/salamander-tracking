@@ -330,7 +330,7 @@ def crop_detailed_image_small_size(cropped_image_original_size, reverse_colors=T
     x, y, w, h = cv.boundingRect(cropped_image_original_size)
 
     # Now crop the image to the bounding box.
-    cropped_image = cropped_image_original_size[y - 1: y + h + 1, x - 1: x + w + 1]
+    cropped_image = cropped_image_original_size[y: y + h, x: x + w]
 
     if reverse_colors:
         # Again reverse the colors back to what we are used to.

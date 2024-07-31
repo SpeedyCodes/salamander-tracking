@@ -15,11 +15,11 @@ This is done in several steps:
 4. Matching the triangles.
 5. Reducing the number of false matches.
 6. Assigning matched points through voting.
-7. [NOT DONE YET] Protecting against spurious assignments.
+7. Computing a score for each matching point patterns.
+8. Displaying the best matches to the user.
 """
 
 from dot_detection.dot_detect_haar import dot_detect_haar
-from Convert_image_to_stips import crop_detailed_image_small_size
 from isolate_salamander import isolate_salamander
 import cv2 as cv
 import numpy as np
@@ -29,7 +29,7 @@ import itertools
 import copy
 
 
-def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]], tol: float = 0.001,
+def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.001,
                          plot_r_values: bool = False):
     """ This function will include a bunch of other functions ...
 
@@ -39,16 +39,64 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
     a scaler multiplied by tol, then we consider these dots as one. (We remove one of the two dots, this ensures that
     the numerical computations are stable).
     INPUT: plot_r_values is a boolean that determines whether to plot the r_values in a histogram.
-    OUTPUT: """
+    OUTPUT: a plot with the three highest matches from the database. """
+
+    list_of_scores = []  # Will include all the images in the database and their matching score with the unknown image.
 
     # First, crop the image to the essential part.
-    image = isolate_salamander(image)
-    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    image = crop_detailed_image_small_size(image, reverse_colors=False)
+    image_crop = crop_image(image)
 
     # Second, load in the list of coordinates of the unknown image and select the points to be used.
-    list_coordinates = load_in_coordinates(image)
+    list_coordinates = load_in_coordinates(image_crop)
     list_coordinates = select_points_to_be_matched(list_coordinates, tol=3 * tol)
+
+    # Then, transform the database of images to a database of lists of coordinates with a name tag.
+    database_of_coordinates = []  # type = set[ list[ set[tuple[float, float] ], str ].
+    # Essentially this is of the form set[ list[ list_of_coordinates, name_tag ] ]
+
+    for image_database, name_image_database in database:
+        image_database = crop_image(image_database)
+        list_coordinates_image_database = load_in_coordinates(image_database)
+        list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3 * tol)
+        database_of_coordinates.append([list_coordinates_image_database, name_image_database])
+
+    # Start matching procedure for every image in the database.
+    for list_coordinates_image_database, name_image_database in database_of_coordinates:
+
+        matched_points, _, _, _ = run_through_algorithm(list_coordinates, list_coordinates_image_database, tol=tol,
+                                                        plot_r_values=plot_r_values)
+
+        # Go a second time through the algorithm, using the output of the first run.
+        list_coordinates_new = [points[0] for points in matched_points]
+        list_coordinates_image_database_new = [points[1] for points in matched_points]
+
+        matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates_new, list_coordinates_image_database_new,
+                                                              tol=tol, plot_r_values=plot_r_values)
+
+        # Compute a score, based on V and f_t and a second score based on the number of successful matched points.
+        S1 = compute_score(V, f_t, V_max)
+        if len(list_coordinates) != 0:
+            S2 = len(matched_points) / len(list_coordinates)
+        else:
+            S2 = 0
+
+        # Add the result to the list of scores.
+        list_of_scores.append((S1, S2, name_image_database))
+
+    # Plotting the results.
+    display_results(image, database, list_of_scores)
+
+    return None
+
+
+def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol: float,
+                          plot_r_values: bool):
+    """ This method runs through all the steps of the algorithm, from creating triangles to assigning matched points."""
+
+    # Check the number of detected points.
+    if not check_number_of_points(list_coordinates, list_coordinates_image_database):
+        return [], 0, 0.0, 0  # This is not a match, go to the next pattern in the database.
+
     # Generate a list of triangles and some extra information.
     list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=8, C_max=0.99, s_max=0.85)
     # We have found R_max by experimentally looking at the histogram with R-values.
@@ -57,34 +105,37 @@ def compare_dot_patterns(image: np.ndarray, database: set[tuple[np.ndarray, str]
         # Plotting the histogram of r_values.
         histogram_r_values(r_values)
 
-    # Then, transform the database of images to a database of lists of coordinates with a name tag.
-    database_of_coordinates = set()  # type = set[ list[ set[tuple[float, float] ], str ].
-    # Essentially this is of the form set[ list[ list_of_coordinates, name_tag ] ]
+    # Make a new list with a lot of triangles and some extra information.
+    list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=8,
+                                                         C_max=0.99,
+                                                         s_max=0.85)
 
-    for image_database, name_image_database in database:
-        image_database = crop_detailed_image_small_size(image_database, reverse_colors=False)
-        list_coordinates_image_database = load_in_coordinates(image_database)
-        list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3 * tol)
-        database_of_coordinates.add([list_coordinates_image_database, name_image_database])
+    # Calculating matches.
+    matches_triangles = matching_triangles(list_triangles, list_triangles_database)
 
-    # Now start the matching procedure.
-    for list_coordinates_image_database, name_image_database in database_of_coordinates:
+    # Reducing false matches.
+    matches_triangles = reduce_false_matches(matches_triangles)
 
-        # Check the number of detected points.
-        if not check_number_of_points(list_coordinates, list_coordinates_image_database):
-            continue  # This is not a match, go to the next pattern in the database.
+    V_max = 3 * len(matches_triangles)
 
-        # Make a new list with a lot of triangles and some extra information.
-        list_triangles_database, _ = generate_list_triangles(list_coordinates_image_database, tol, R_max=8, C_max=0.99,
-                                                             s_max=0.85)
+    # Matching the points.
+    matched_points, V, f_t = assign_matched_points(matches=matches_triangles,
+                                                   total_nr_triangles_before_matching=len(list_triangles))
 
-        # Calculating matches.
-        matches = matching_triangles(list_triangles, list_triangles_database)
+    return matched_points, V, f_t, V_max
 
-        # Reducing false matches.
-        matches = reduce_false_matches(matches)
 
-    return None
+def crop_image(image):
+    """ This method will literally crop the image. So we remove the non-interesting, white background. """
+
+    image = isolate_salamander(image)
+    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    x, y, w, h = cv.boundingRect(image_gray)
+
+    # Now crop the image to the bounding box.
+    cropped_image = image[y: y + h, x: x + w]
+
+    return cropped_image
 
 
 """ STEP 0: Loading in the list of coordinates/points. """
@@ -118,7 +169,8 @@ def load_in_coordinates(image) -> set[tuple[float, float]]:
     We extract the centroid of this input and also normalize the coordinates to the [0, 1] interval.
     Furthermore, we use a new origin, located at the bottom left of the image."""
 
-    height_image, width_image = image.shape
+    height_image = image.shape[0]
+    width_image = image.shape[1]
 
     list_coordinates = set()
 
@@ -171,7 +223,7 @@ def select_points_to_be_matched(list_coordinates, tol: float):
 """ STEP 2: Check if the number of coordinates/points is approximately equal. """
 
 
-def check_number_of_points(list_coordinates1, list_coordinates2, tol: int = 5):
+def check_number_of_points(list_coordinates1, list_coordinates2, tol: int = 10):
     """ This method returns True if the difference of number of points is less than the tolerance and False otherwise.
     In this way, a salamander with a lot of points won't get matched with a salamander with few points.
     Furthermore, this ensures that the lists of coordinates are approximately of equal size. From the literature,
@@ -351,18 +403,21 @@ def matching_triangles(list_triangles1, list_triangles2):
 
     CONTENT: list_triangles: [ ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ) ] """
 
+    if len(list_triangles1) == 0 or len(list_triangles2) == 0:
+        return []
+
     # First sort the two lists, based on increasing R values.
     list_triangles1.sort(key=lambda x: x[1])
     list_triangles2.sort(key=lambda x: x[1])
 
-    # Finding the maximal tol_r for both lists.
-    max_tol_r_a = max(list_triangles1, key=lambda x: x[3])
-    max_tol_r_b = max(list_triangles2, key=lambda x: x[3])
+    # Then, find the maximal tol_r for both lists.
+    max_tol_r_a = max([tol_r_a for _, _, _, tol_r_a, _, _, _ in list_triangles1])
+    max_tol_r_b = max([tol_r_b for _, _, _, tol_r_b, _, _, _ in list_triangles2])
 
     matches = []
-    # We iterate over list 2 with variable j, variable "i" also iterates over list 2, but it finds the lower bound.
-    # Then the parameter j will start at this lower bound and end at an upper bound. This prevents brute force
-    # calculation and allows us to only compare a few of the triangles.
+    # We iterate over list 2 with variable j, variable "i" also iterates over list 2, but it finds the lower bound for
+    # j. Then the parameter j will start at this lower bound and end at an upper bound. This prevents brute force
+    # calculation and allows us to only compare some of the triangles.
     i = 0
 
     for triangle1 in list_triangles1:
@@ -387,11 +442,11 @@ def matching_triangles(list_triangles1, list_triangles2):
 
             j += 1
 
-        # If there are any potential matches, find the closest one based on check1 criteria from the previous method.
-        # This ensures that we have at most one match for every triangle of list 1.
-        if potential_matches:
-            best_match = min(potential_matches, key=lambda x: (triangle1[1] - x[1]) ** 2)
-            matches.append((triangle1, best_match))
+        # If there are any potential matches, find the closest one based on the check1 criteria from the previous
+        # method. This ensures that we have at most one match for every triangle of list 1.
+        if len(potential_matches) > 0:
+            best_match = min(potential_matches, key=lambda x: (R_a - x[1][1]) ** 2)
+            matches.append(best_match)
 
     return matches
 
@@ -506,19 +561,23 @@ def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, facto
 """ STEP 6: Assigning matched points through voting. """
 
 
-def assign_matched_points(matches: list[tuple]):
+def assign_matched_points(matches: list[tuple], total_nr_triangles_before_matching: int):
     """ This method assigns points to each other using a voting system. For every matching two triangles, we cast
     three votes for the corresponding vertices. Then we only keep the most frequent votes and these are most likely
     true matching points."""
 
-    if len(matches) == 0:
-        return matches
+    if len(matches) == 0 or total_nr_triangles_before_matching == 0:
+        return matches, 0, 0.0
+
+    contributing_triangles = set()  # Tracks the unique triangles contributing to the voting proces.
 
     # First cast all the votes for every matching triangle.
     voting_dict = dict()
     for triangle1, triangle2, _, _ in matches:
         (vertex11, vertex12, vertex13), _, _, _, _, _, _ = triangle1
         (vertex21, vertex22, vertex23), _, _, _, _, _, _ = triangle2
+
+        contributing_triangles.add(triangle1)
 
         if (vertex11, vertex21) not in voting_dict.keys():
             voting_dict[(vertex11, vertex21)] = 1
@@ -528,7 +587,7 @@ def assign_matched_points(matches: list[tuple]):
         if (vertex12, vertex22) not in voting_dict.keys():
             voting_dict[(vertex12, vertex22)] = 1
         else:
-            voting_dict[(vertex11, vertex22)] += 1
+            voting_dict[(vertex12, vertex22)] += 1
 
         if (vertex13, vertex23) not in voting_dict.keys():
             voting_dict[(vertex13, vertex23)] = 1
@@ -543,11 +602,12 @@ def assign_matched_points(matches: list[tuple]):
     nr_of_most_votes = voting_list[0][1]
     threshold_for_nr_of_votes = nr_of_most_votes // 2  # We stop if the number of votes drops by a factor of 2.
     if nr_of_most_votes <= 1:
-        return []  # In this case, there is no match, so we just return an empty list.
+        return [], 0, 0.0  # In this case, there is no match, so we just return an empty list.
 
-    # Storage the matching pairs of points.
-    matching_points = []
-    used_points = set()
+    matching_points = []  # Storage the matching pairs of points.
+    used_points1 = set()
+    used_points2 = set()
+    V = 0  # Sum of the votes of the successfully matched pairs.
 
     for (point1, point2), nr_of_votes in voting_list:
 
@@ -555,11 +615,87 @@ def assign_matched_points(matches: list[tuple]):
         if nr_of_votes < threshold_for_nr_of_votes:
             break
 
-        if point1 in used_points or point2 in used_points:
-            continue  # Since we already have a better match at this point in our matching points list.
+        if point1 in used_points1 or point2 in used_points2:
+            break  # Since we already have a better match at this point in our matching points list.
+
+        if nr_of_votes == 0:
+            break
 
         matching_points.append((point1, point2))
-        used_points.add(point1)
-        used_points.add(point2)
+        used_points1.add(point1)
+        used_points2.add(point2)
 
-    return matching_points
+        V += nr_of_votes
+        threshold_for_nr_of_votes = nr_of_votes // 2  # Updating the threshold.
+
+    # Calculate the ratio of voting triangles to the total number of triangles.
+    f_t = len(contributing_triangles) / total_nr_triangles_before_matching
+
+    return matching_points, V, f_t
+
+
+""" STEP 7: Computing a score for each matching point patterns. """
+
+
+def compute_score(V: int, f_t: float, V_max: int):
+    """ This method computes a score based on V and f_t, and then we normalize it. The higher the score, the better."""
+
+    if V_max == 0:
+        return 0
+
+    S = V * f_t
+    S = S / V_max
+
+    return S
+
+
+""" STEP 8: Displaying the best matches to the user. """
+
+
+def score_combined(S1, S2, weight_S1=0.5, weight_S2=0.5):
+    """ This method calculates the combined score based on S1 and S2. The higher the score, the better. """
+
+    S_combined = S1 * weight_S1 + S2 * weight_S2
+
+    return S_combined
+
+
+def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
+                    list_of_scores: list[tuple[float, float, str]], weight_S1=0.5, weight_S2=0.5):
+    """ This method will display the three best matches to the user.
+
+    INPUT: list_of_scores is of the form [ (S1, S2, name), ... ]. """
+
+    # Convert the database in a dictionary for easy acces.
+    database = {name: image for image, name in database}
+
+    # Sort the list_of_scored based on highest combined score.
+    list_of_scores = sorted(list_of_scores, key=lambda x: score_combined(x[0], x[1], weight_S1, weight_S2),
+                            reverse=True)
+
+    # Select the top three matches.
+    top_matches = list_of_scores[:3]
+
+    # Plot the unknown image and top matches with information on one plot.
+    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+
+    image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+    axes[0].imshow(image)
+    axes[0].set_title("Unknown Image")
+    axes[0].axis('off')
+
+    for i, (S1, S2, name) in enumerate(top_matches):
+        image_database = database.get(name, None)
+        image_database = cv.cvtColor(image_database, cv.COLOR_BGR2RGB)  # Load and convert the image data
+        combined_score = score_combined(S1, S2, weight_S1, weight_S2)
+        axes[i + 1].imshow(image_database)
+        axes[i + 1].set_title(name.split('.')[0])
+        axes[i + 1].axis('off')
+        # Display the scores beneath the image
+        axes[i + 1].text(0.5, -0.1, f"Score1: {S1:.1f}\nScore2: {S2:.2f}\nTotal Score: {combined_score:.2f}",
+                         transform=axes[i + 1].transAxes, ha='center', va='top', fontsize=10)
+
+    plt.tight_layout()
+    plt.show()
+
+    return None
