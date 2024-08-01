@@ -78,14 +78,14 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
                                                               tol=tol, plot_r_values=plot_r_values)
 
         # Compute a score, based on V and f_t and a second score based on the number of successful matched points.
-        S1 = compute_score(V, f_t, V_max)
+        S1, S1_rel, keyword = compute_score(V, f_t, V_max)
         if len(list_coordinates) != 0:
             S2 = len(matched_points) / len(list_coordinates)
         else:
             S2 = 0
 
         # Add the result to the list of scores.
-        list_of_scores.append((S1, S2, name_image_database))
+        list_of_scores.append((S1, S1_rel, S2, keyword, name_image_database))
         loading_bar.update(1)
 
     # Plotting the results.
@@ -609,7 +609,7 @@ def assign_matched_points(matches: list[tuple], total_nr_triangles_before_matchi
 
     nr_of_most_votes = voting_list[0][1]
     threshold_for_nr_of_votes = nr_of_most_votes // 2  # We stop if the number of votes drops by a factor of 2.
-    if nr_of_most_votes <= 1:
+    if nr_of_most_votes <= 1:  # Very strong condition to filter out false matches!
         return [], 0, 0.0  # In this case, there is no match, so we just return an empty list.
 
     matching_points = []  # Storage the matching pairs of points.
@@ -649,59 +649,76 @@ def compute_score(V: int, f_t: float, V_max: int):
     """ This method computes a score based on V and f_t, and then we normalize it. The higher the score, the better."""
 
     if V_max == 0:
-        return 0
+        return 0, 0.0, 'No'
 
     S = V * f_t
-    S = S / V_max
+    S_rel = S / V_max
 
-    return S
+    if S <= 10:
+        keyword = 'No'
+    elif 10 < S <= 100 and f_t < 0.05:
+        keyword = 'Weak'
+    elif 10 < S <= 100 and f_t >= 0.05:
+        keyword = 'Medium'
+    else:
+        keyword = 'Strong'
+
+    return S, S_rel, keyword
 
 
 """ STEP 8: Displaying the best matches to the user. """
 
 
-def score_combined(S1, S2, weight_S1=0.5, weight_S2=0.5):
+def score_combined(S1_rel, S2, weight_S1=0.4, weight_S2=0.7):
     """ This method calculates the combined score based on S1 and S2. The higher the score, the better. """
 
-    S_combined = S1 * weight_S1 + S2 * weight_S2
+    S_combined = S1_rel * weight_S1 + S2 * weight_S2
 
     return S_combined
 
 
 def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
-                    list_of_scores: list[tuple[float, float, str]], weight_S1=0.5, weight_S2=0.5):
+                    list_of_scores: list[tuple[int, float, float, str, str]], weight_S1=0.5, weight_S2=0.5):
     """ This method will display the three best matches to the user.
 
-    INPUT: list_of_scores is of the form [ (S1, S2, name), ... ]. """
+    INPUT: list_of_scores is of the form [ (S1, S1_rel, S2, keyword, name), ... ]. """
 
     # Convert the database in a dictionary for easy acces.
     database = {name: image for image, name in database}
 
     # Sort the list_of_scored based on highest combined score.
-    list_of_scores = sorted(list_of_scores, key=lambda x: score_combined(x[0], x[1], weight_S1, weight_S2),
+    list_of_scores = sorted(list_of_scores, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
                             reverse=True)
 
     # Select the top three matches.
     top_matches = list_of_scores[:3]
 
     # Plot the unknown image and top matches with information on one plot.
-    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(10, 5))
 
     image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
     axes[0].imshow(image)
     axes[0].set_title("Unknown Image")
     axes[0].axis('off')
 
-    for i, (S1, S2, name) in enumerate(top_matches):
+    for i, (S1, S1_rel, S2, keyword, name) in enumerate(top_matches):
+
+        S2 = "%.2f" % round(S2 * 100, 2)
+        S2 = str(S2) + '%'
+
         image_database = database.get(name, None)
         image_database = cv.cvtColor(image_database, cv.COLOR_BGR2RGB)  # Load and convert the image data
-        combined_score = score_combined(S1, S2, weight_S1, weight_S2)
         axes[i + 1].imshow(image_database)
         axes[i + 1].set_title(name.split('.')[0])
         axes[i + 1].axis('off')
         # Display the scores beneath the image
-        axes[i + 1].text(0.5, -0.1, f"Score1: {S1:.1f}\nScore2: {S2:.2f}\nTotal Score: {combined_score:.2f}",
+        axes[i + 1].text(0.5, -0.1, f"Score1: {S1:.2f}\nScore2: {S2}\n{keyword} match",
                          transform=axes[i + 1].transAxes, ha='center', va='top', fontsize=10)
+
+    # Add a vertical black line between the unknown image and the first match
+    line_x = (axes[0].get_position().x1 + axes[1].get_position().x0) / 2 - 0.055
+    fig.add_artist(plt.Line2D((line_x, line_x), (0, 1), color='black', linewidth=2,
+                              transform=fig.transFigure))
 
     plt.tight_layout()
     plt.show()
