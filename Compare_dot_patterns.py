@@ -30,8 +30,8 @@ import itertools
 import copy
 
 
-def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.001,
-                         plot_r_values: bool = False):
+def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.01,
+                         is_second_run: bool = True, plot_r_values: bool = False):
     """ This function will include a bunch of other functions ...
 
     INPUT: image denotes the unknown image, this is the image we want to compare with our database.
@@ -39,6 +39,9 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     INPUT: the tolerance tol is a parameter that the user is free to set. If detected dots have distance less than
     a scaler multiplied by tol, then we consider these dots as one. (We remove one of the two dots, this ensures that
     the numerical computations are stable).
+    INPUT: is_second_run is True when we go twice through the algorithm, if it is False we go one time through the
+    algorithm. A second run ensures that the matches are of higher quality, but at the cost of a higher chance of
+    missing True matches.
     INPUT: plot_r_values is a boolean that determines whether to plot the r_values in a histogram.
     OUTPUT: a plot with the three highest matches from the database. """
 
@@ -67,22 +70,25 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     # Start matching procedure for every image in the database.
     for list_coordinates_image_database, name_image_database in database_of_coordinates:
 
-        matched_points, _, _, _ = run_through_algorithm(list_coordinates, list_coordinates_image_database, tol=tol,
-                                                        plot_r_values=plot_r_values)
+        matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates, list_coordinates_image_database,
+                                                              tol=tol,
+                                                              plot_r_values=plot_r_values)
 
-        # Go a second time through the algorithm, using the output of the first run.
-        list_coordinates_new = [points[0] for points in matched_points]
-        list_coordinates_image_database_new = [points[1] for points in matched_points]
+        if is_second_run:
+            # Go a second time through the algorithm, using the output of the first run.
+            list_coordinates_new = [points[0] for points in matched_points]
+            list_coordinates_image_database_new = [points[1] for points in matched_points]
 
-        matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates_new, list_coordinates_image_database_new,
-                                                              tol=tol, plot_r_values=plot_r_values)
+            matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates_new,
+                                                                  list_coordinates_image_database_new,
+                                                                  tol=tol, plot_r_values=plot_r_values)
 
         # Compute a score, based on V and f_t and a second score based on the number of successful matched points.
-        S1, S1_rel, keyword = compute_score(V, f_t, V_max)
         if len(list_coordinates) != 0:
             S2 = len(matched_points) / len(list_coordinates)
         else:
             S2 = 0
+        S1, S1_rel, keyword = compute_score(V, f_t, V_max, S2)
 
         # Add the result to the list of scores.
         list_of_scores.append((S1, S1_rel, S2, keyword, name_image_database))
@@ -136,14 +142,18 @@ def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol
 def crop_image(image):
     """ This method will literally crop the image. So we remove the non-interesting, white background. """
 
-    image = isolate_salamander(image)
-    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    x, y, w, h = cv.boundingRect(image_gray)
+    try:
+        image = isolate_salamander(image)
+    except:
+        return image
+    else:
+        image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        x, y, w, h = cv.boundingRect(image_gray)
 
-    # Now crop the image to the bounding box.
-    cropped_image = image[y: y + h, x: x + w]
+        # Now crop the image to the bounding box.
+        cropped_image = image[y: y + h, x: x + w]
 
-    return cropped_image
+        return cropped_image
 
 
 """ STEP 0: Loading in the list of coordinates/points. """
@@ -187,7 +197,8 @@ def load_in_coordinates(image) -> set[tuple[float, float]]:
     # of the image. (x, y) denotes the upper left coordinate of the rectangle. Width and height respectively denote
     # the length of the side of the rectangle, starting from the (x, y) coordinate, in x and y direction.
     list_haar_cascade = dot_detect_haar(image)
-    assert len(list_haar_cascade) > 0, 'No dots detected :('
+    if len(list_haar_cascade) == 0:
+        return set()
 
     for (x, y, w, h) in list_haar_cascade:
         # First, we try to detect the center of the rectangle in the given coordinate system.
@@ -645,7 +656,7 @@ def assign_matched_points(matches: list[tuple], total_nr_triangles_before_matchi
 """ STEP 7: Computing a score for each matching point patterns. """
 
 
-def compute_score(V: int, f_t: float, V_max: int):
+def compute_score(V: int, f_t: float, V_max: int, S2: float):
     """ This method computes a score based on V and f_t, and then we normalize it. The higher the score, the better."""
 
     if V_max == 0:
@@ -654,11 +665,12 @@ def compute_score(V: int, f_t: float, V_max: int):
     S = V * f_t
     S_rel = S / V_max
 
-    if S <= 10:
+    S2 = S2 * 100  # Converting to percent.
+    if S2 <= 10:
         keyword = 'No'
-    elif 10 < S <= 100 and f_t < 0.05:
+    elif 10 < S2 <= 40:
         keyword = 'Weak'
-    elif 10 < S <= 100 and f_t >= 0.05:
+    elif 40 < S2 <= 70:
         keyword = 'Medium'
     else:
         keyword = 'Strong'
@@ -669,7 +681,7 @@ def compute_score(V: int, f_t: float, V_max: int):
 """ STEP 8: Displaying the best matches to the user. """
 
 
-def score_combined(S1_rel, S2, weight_S1=0.4, weight_S2=0.7):
+def score_combined(S1_rel, S2, weight_S1, weight_S2):
     """ This method calculates the combined score based on S1 and S2. The higher the score, the better. """
 
     S_combined = S1_rel * weight_S1 + S2 * weight_S2
@@ -677,8 +689,30 @@ def score_combined(S1_rel, S2, weight_S1=0.4, weight_S2=0.7):
     return S_combined
 
 
+def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
+    """ This method sorts the list of scores based on its parameters. We contain the matches with S1 >= 50 in the top
+    list, the others go in the bottom list. Then we sort the lists, based on the combined score. And finally we
+    merge the lists back together. """
+
+    top_list = []
+    bottom_list = []
+
+    for (S1, S1_rel, S2, keyword, name) in list_of_scores:
+        if S1 >= 50:
+            top_list.append((S1, S1_rel, S2, keyword, name))
+        else:
+            bottom_list.append((S1, S1_rel, S2, keyword, name))
+
+    top_list = sorted(top_list, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
+                      reverse=True)
+    bottom_list = sorted(bottom_list, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
+                         reverse=True)
+
+    return top_list + bottom_list
+
+
 def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
-                    list_of_scores: list[tuple[int, float, float, str, str]], weight_S1=0.5, weight_S2=0.5):
+                    list_of_scores: list[tuple[int, float, float, str, str]], weight_S1=0.3, weight_S2=0.7):
     """ This method will display the three best matches to the user.
 
     INPUT: list_of_scores is of the form [ (S1, S1_rel, S2, keyword, name), ... ]. """
@@ -687,14 +721,13 @@ def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
     database = {name: image for image, name in database}
 
     # Sort the list_of_scored based on highest combined score.
-    list_of_scores = sorted(list_of_scores, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
-                            reverse=True)
+    list_of_scores = sort_list_of_scores(list_of_scores, weight_S1, weight_S2)
 
     # Select the top three matches.
     top_matches = list_of_scores[:3]
 
     # Plot the unknown image and top matches with information on one plot.
-    fig, axes = plt.subplots(1, 4, figsize=(10, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
 
     image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
     axes[0].imshow(image)
@@ -702,7 +735,6 @@ def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
     axes[0].axis('off')
 
     for i, (S1, S1_rel, S2, keyword, name) in enumerate(top_matches):
-
         S2 = "%.2f" % round(S2 * 100, 2)
         S2 = str(S2) + '%'
 
