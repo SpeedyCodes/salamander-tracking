@@ -21,6 +21,7 @@ This is done in several steps:
 
 from dot_detection.dot_detect_haar import dot_detect_haar
 from isolate_salamander import isolate_salamander
+from tqdm import tqdm
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -41,6 +42,8 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     INPUT: plot_r_values is a boolean that determines whether to plot the r_values in a histogram.
     OUTPUT: a plot with the three highest matches from the database. """
 
+    loading_bar = tqdm(total=len(database) + 1)  # Keeps track on how far the algorithm is.
+
     list_of_scores = []  # Will include all the images in the database and their matching score with the unknown image.
 
     # First, crop the image to the essential part.
@@ -60,6 +63,7 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
         list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3 * tol)
         database_of_coordinates.append([list_coordinates_image_database, name_image_database])
 
+    loading_bar.update(1)
     # Start matching procedure for every image in the database.
     for list_coordinates_image_database, name_image_database in database_of_coordinates:
 
@@ -82,6 +86,7 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
 
         # Add the result to the list of scores.
         list_of_scores.append((S1, S2, name_image_database))
+        loading_bar.update(1)
 
     # Plotting the results.
     display_results(image, database, list_of_scores)
@@ -96,6 +101,9 @@ def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol
     # Check the number of detected points.
     if not check_number_of_points(list_coordinates, list_coordinates_image_database):
         return [], 0, 0.0, 0  # This is not a match, go to the next pattern in the database.
+
+    if len(list_coordinates) == 0 or len(list_coordinates_image_database) == 0:
+        return [], 0, 0.0, 0
 
     # Generate a list of triangles and some extra information.
     list_triangles, r_values = generate_list_triangles(list_coordinates, tol, R_max=8, C_max=0.99, s_max=0.85)

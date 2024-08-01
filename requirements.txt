@@ -3,3 +3,4 @@ numpy
 matplotlib
 pillow-heif
 flask
+tqdm
