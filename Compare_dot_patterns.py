@@ -410,7 +410,7 @@ def is_possible_match(triangle1, triangle2) -> bool:
     return check1 and check2
 
 
-def matching_triangles(list_triangles1, list_triangles2):
+def matching_triangles_old(list_triangles1, list_triangles2):
     """ This method tries to find a match between two lists of triangles. Essentially we can just compare all the
     triangles of both lists and use is_possible_match on them, but for optimal computational time, we will do something
     like a merge sort. By sorting the lists and using tolerance ranges, we significantly reduce the number of
@@ -470,6 +470,47 @@ def matching_triangles(list_triangles1, list_triangles2):
     return matches
 
 
+def matching_triangles(list_triangles1, list_triangles2) -> set:
+    """ This method tries to find a match between two lists of triangles. Essentially we can just compare all the
+    triangles of both lists and use is_possible_match on them, but for optimal computational time, we will first sort
+    all the triangles of the second list. We sort them in such a way that we first try the most likely matches
+    [eq 17 Journal Applied Ecology]. When a match is found, we move on to the next triangle from list 1 since we only
+    want 1 match (the best match) for every triangle from list 1.
+
+    INPUT: list_triangles1: this is the list of triangles, determined by the unknown image.
+    INPUT: list_triangles2: this is the list of triangles, determined by some image from our database.
+
+    CONTENT: list_triangles: [ ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation ) ] """
+
+    if len(list_triangles1) == 0 or len(list_triangles2) == 0:
+        return set()
+
+    matches = set()
+
+    for triangle1 in list_triangles1:
+        R_a = triangle1[1]
+        """
+        [eq 17 Journal Applied Ecology], not chosen to work with since it dramatically increases computation time.
+        But code is the following:
+        C_a = triangle1[2]
+        tol_r_a = triangle1[3]
+        tol_c_a = triangle1[4]
+
+        # Sort the triangles from list 2, [eq 17 Journal Applied Ecology].
+        list_triangles2.sort(key=lambda triangle: (((R_a - triangle[1]) ** 2) / (tol_r_a ** 2 + triangle[3] ** 2)) +
+                                                  (((C_a - triangle[2]) ** 2) / (tol_c_a ** 2 + triangle[4] ** 2)))
+        """
+        list_triangles2.sort(key=lambda x: (R_a - x[1]) ** 2)  # Quicker and still reliable way to sort list 2.
+
+        for triangle2 in list_triangles2:
+            # Check if this pair of triangles match.
+            if is_possible_match(triangle1, triangle2):
+                matches.add((triangle1, triangle2))
+                break  # Go to the next triangle, since we have a match for this triangle.
+
+    return matches
+
+
 """ STEP 5: Reducing the number of false matches. """
 
 
@@ -481,7 +522,7 @@ def compute_extra_info_for_matches(matches):
     INPUT: a match is a tuple of two triangles, such a triangle is the following:
     ( (vertex1, vertex2, vertex3), R, C, tol_r, tol_c, log_p, orientation )."""
 
-    matches_extra_info = []
+    matches_extra_info = set()
 
     for (triangle1, triangle2) in matches:
         log_p1 = triangle1[5]
@@ -495,19 +536,19 @@ def compute_extra_info_for_matches(matches):
         else:
             sense = 'opposite'
 
-        matches_extra_info.append((triangle1, triangle2, log_M, sense))
+        matches_extra_info.add((triangle1, triangle2, log_M, sense))
 
     return matches_extra_info
 
 
-def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, factor: float = 0.1):
+def reduce_false_matches(matches: set[tuple], iteration_limit: bool = 20, factor: float = 0.1) -> set:
     """ This method reduces the number of false matches based on the logarithm of the magnification factor M,
     its distribution and the orientation of the triangles."""
 
     """ First, calculate the logarithm of the magnification factor M and the same- or opposite-sense variable 
     (triangles or same sense if they are both the same oriented, otherwise they are opposite-sense) for each match."""
 
-    matches = compute_extra_info_for_matches(matches)
+    matches: set = compute_extra_info_for_matches(matches)
 
     """ matches is of the following type:
     (triangle1, triangle2, log_M, sense), where a triangle is of the following type:
@@ -521,7 +562,7 @@ def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, facto
     iteration = 0
 
     if len(matches) == 0:
-        return matches
+        return set()
 
     while is_match_discarded and iteration < iteration_limit and len(matches) > 0:
 
@@ -545,16 +586,16 @@ def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, facto
             scaler = 2
 
         is_match_discarded = False
-        matches_copy = []
+        matches_copy = copy.copy(matches)
 
         # Only keep the matches that are close to the mean of log_M, this ensures we keep the true matches.
-        for (triangle1, triangle2, log_M, sense) in matches:
+        for (triangle1, triangle2, log_M, sense) in matches_copy:
             if abs(log_M - mean_log_M) <= scaler * std_dev_log_M:
-                matches_copy.append((triangle1, triangle2, log_M, sense))
+                continue
             else:
                 is_match_discarded = True
+                matches.remove((triangle1, triangle2, log_M, sense))
 
-        matches = copy.deepcopy(matches_copy)
         iteration += 1
 
     """ Third, we filter on the sense values. So after the iterative proces from the previous step, 
@@ -563,24 +604,24 @@ def reduce_false_matches(matches: list[tuple], iteration_limit: bool = 20, facto
     n_plus = sum(1 for _, _, _, sense in matches if sense == 'same')  # Number of same senses.
     n_minus = sum(1 for _, _, _, sense in matches if sense == 'opposite')  # Number of opposite senses.
 
-    matches_copy = []
+    matches_copy = copy.copy(matches)
 
     if n_plus >= n_minus:
         remove_matches = 'opposite'
     else:
         remove_matches = 'same'
 
-    for (triangle1, triangle2, log_M, sense) in matches:
-        if sense != remove_matches:
-            matches_copy.append((triangle1, triangle2, log_M, sense))
+    for (triangle1, triangle2, log_M, sense) in matches_copy:
+        if sense == remove_matches:
+            matches.remove((triangle1, triangle2, log_M, sense))
 
-    return matches_copy
+    return matches
 
 
 """ STEP 6: Assigning matched points through voting. """
 
 
-def assign_matched_points(matches: list[tuple], total_nr_triangles_before_matching: int):
+def assign_matched_points(matches: set[tuple], total_nr_triangles_before_matching: int):
     """ This method assigns points to each other using a voting system. For every matching two triangles, we cast
     three votes for the corresponding vertices. Then we only keep the most frequent votes and these are most likely
     true matching points."""
@@ -616,7 +657,7 @@ def assign_matched_points(matches: list[tuple], total_nr_triangles_before_matchi
     # Convert the dictionary to a list and sort the votes in decreasing order.
     voting_list = list(voting_dict.items())
     """ Voting list is of the form [ ( (vertex, vertex), vote ), ... ]"""
-    voting_list = sorted(voting_list, key=lambda item: item[1], reverse=True)
+    voting_list.sort(key=lambda item: item[1], reverse=True)
 
     nr_of_most_votes = voting_list[0][1]
     threshold_for_nr_of_votes = nr_of_most_votes // 2  # We stop if the number of votes drops by a factor of 2.
@@ -703,10 +744,8 @@ def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
         else:
             bottom_list.append((S1, S1_rel, S2, keyword, name))
 
-    top_list = sorted(top_list, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
-                      reverse=True)
-    bottom_list = sorted(bottom_list, key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2),
-                         reverse=True)
+    top_list.sort(key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2), reverse=True)
+    bottom_list.sort(key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2), reverse=True)
 
     return top_list + bottom_list
 
