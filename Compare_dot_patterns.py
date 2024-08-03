@@ -95,9 +95,9 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
         loading_bar.update(1)
 
     # Plotting the results.
-    display_results(image, database, list_of_scores)
+    list_of_scores = display_results(image, database, list_of_scores)
 
-    return None
+    return list_of_scores
 
 
 def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol: float,
@@ -794,4 +794,4 @@ def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
     plt.tight_layout()
     plt.show()
 
-    return None
+    return list_of_scores
