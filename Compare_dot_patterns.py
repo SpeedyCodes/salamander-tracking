@@ -33,7 +33,8 @@ import threading
 
 
 def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.01,
-                         is_second_run: bool = True, plot_r_values: bool = False):
+                         is_second_run: bool = True, plot_r_values: bool = False,
+                         thread_counts: tuple[int, int] = (8, 1)):
     """ This function will include a bunch of other functions ...
 
     INPUT: image denotes the unknown image, this is the image we want to compare with our database.
@@ -64,7 +65,7 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
 
     start_time = time()
     threads = []
-    thread_count = 16
+    thread_count = thread_counts[0]
 
     def image_to_coords(image_database, name_image_database):
         image_database = crop_image(image_database)
@@ -82,7 +83,7 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
 
         for i in range(thread_count):
             threads.append(threading.Thread(target=thread_function, args=(
-            i * len(database) // thread_count, (i + 1) * len(database) // thread_count)))
+                i * len(database) // thread_count, (i + 1) * len(database) // thread_count)))
             threads[-1].start()
 
         for thread in threads:
@@ -92,7 +93,6 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     loading_bar.update(1)
 
     start_time = time()
-
 
     def matching_procedure(list_coordinates_image_database, name_image_database):
         matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates, list_coordinates_image_database,
@@ -118,9 +118,8 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
         # Add the result to the list of scores.
         list_of_scores.append((S1, S1_rel, S2, keyword, name_image_database))
 
-
     threads = []
-    thread_count = 1
+    thread_count = thread_counts[1]
 
     # Start matching procedure for every image in the database.
     if thread_count == 1:  # no threading
@@ -135,14 +134,12 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
 
         for i in range(thread_count):
             threads.append(threading.Thread(target=thread_function, args=(
-            i * len(database_of_coordinates) // thread_count, (i + 1) * len(database_of_coordinates) // thread_count)))
+                i * len(database_of_coordinates) // thread_count,
+                (i + 1) * len(database_of_coordinates) // thread_count)))
             threads[-1].start()
 
         for thread in threads:
             thread.join()
-
-
-
 
     print(f"Time for matching procedure: {time() - start_time} seconds ---")
     # Plotting the results.
@@ -314,9 +311,9 @@ def orientation_triangle(vertex1, vertex2, vertex3) -> str:
 
     A = (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
-    if A > 0:
+    if A > 0.001:
         return "Counter-clockwise"
-    elif A < 0:
+    elif A < - 0.001:
         return "Clockwise"
     else:
         return "Collinear"

@@ -1,10 +1,6 @@
-import cv2
-
-from dot_detection.dot_detect_haar import dot_detect_haar
-from isolate_salamander import isolate_salamander
 from Generating_extra_data import filenames_from_folder
 from utils.heic_imread_wrapper import wrapped_imread
-from Compare_dot_patterns import crop_image, compare_dot_patterns
+from Compare_dot_patterns import compare_dot_patterns
 from time import time
 
 database = []
