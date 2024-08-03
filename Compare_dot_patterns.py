@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 import math
 import itertools
 import copy
+from time import time
+import threading
 
 
 def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.01,
@@ -60,16 +62,39 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     database_of_coordinates = []  # type = set[ list[ set[tuple[float, float] ], str ].
     # Essentially this is of the form set[ list[ list_of_coordinates, name_tag ] ]
 
-    for image_database, name_image_database in database:
+    start_time = time()
+    threads = []
+    thread_count = 16
+
+    def image_to_coords(image_database, name_image_database):
         image_database = crop_image(image_database)
         list_coordinates_image_database = load_in_coordinates(image_database)
         list_coordinates_image_database = select_points_to_be_matched(list_coordinates_image_database, tol=3 * tol)
         database_of_coordinates.append([list_coordinates_image_database, name_image_database])
 
-    loading_bar.update(1)
-    # Start matching procedure for every image in the database.
-    for list_coordinates_image_database, name_image_database in database_of_coordinates:
+    if thread_count == 1:  # no threading
+        for image_database, name_image_database in database:
+            image_to_coords(image_database, name_image_database)
+    else:  # threaded execution
+        def thread_function(start, end):
+            for i in range(start, end):
+                image_to_coords(database[i][0], database[i][1])
 
+        for i in range(thread_count):
+            threads.append(threading.Thread(target=thread_function, args=(
+            i * len(database) // thread_count, (i + 1) * len(database) // thread_count)))
+            threads[-1].start()
+
+        for thread in threads:
+            thread.join()
+
+    print(f"Time for loading DB: {time() - start_time} seconds")
+    loading_bar.update(1)
+
+    start_time = time()
+
+
+    def matching_procedure(list_coordinates_image_database, name_image_database):
         matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates, list_coordinates_image_database,
                                                               tol=tol,
                                                               plot_r_values=plot_r_values)
@@ -92,8 +117,34 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
 
         # Add the result to the list of scores.
         list_of_scores.append((S1, S1_rel, S2, keyword, name_image_database))
-        loading_bar.update(1)
 
+
+    threads = []
+    thread_count = 1
+
+    # Start matching procedure for every image in the database.
+    if thread_count == 1:  # no threading
+        for list_coordinates_image_database, name_image_database in database_of_coordinates:
+            matching_procedure(list_coordinates_image_database, name_image_database)
+            loading_bar.update(1)
+    else:  # threaded execution
+        def thread_function(start, end):
+            for i in range(start, end):
+                matching_procedure(database_of_coordinates[i][0], database_of_coordinates[i][1])
+                loading_bar.update(1)
+
+        for i in range(thread_count):
+            threads.append(threading.Thread(target=thread_function, args=(
+            i * len(database_of_coordinates) // thread_count, (i + 1) * len(database_of_coordinates) // thread_count)))
+            threads[-1].start()
+
+        for thread in threads:
+            thread.join()
+
+
+
+
+    print(f"Time for matching procedure: {time() - start_time} seconds ---")
     # Plotting the results.
     list_of_scores = display_results(image, database, list_of_scores)
 
