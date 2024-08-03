@@ -1,9 +1,10 @@
 import cv2 as cv
 from utils.heic_imread_wrapper import wrapped_imread
+from isolate_salamander import isolate_salamander
 
 
 def draw_rectangles(img, rectangles):
-    line_color = (0, 255, 0)
+    line_color = (0, 0, 255)
     line_type = cv.LINE_4
     for (x, y, width, height) in rectangles:
         top_left = (x, y)
@@ -20,12 +21,17 @@ def dot_detect_haar(image):
     return cascade.detectMultiScale(image)
 
 if __name__ == '__main__':
-    #input = wrapped_imread('../input/2024/IMG_3023.jpeg')
-    #input = wrapped_imread('../input/2024/IMG_3024.jpeg')
-    #input = wrapped_imread('../input/2021/2021-Sal09.jpg')
-    input = wrapped_imread('../input/2019/2019-Sal18.jpg')
+    inputs = [wrapped_imread('input/2024/IMG_3023.jpeg'),
+              wrapped_imread('input/2024/IMG_3024.jpeg'),
+              wrapped_imread('input/2021/2021-Sal09.jpg'),
+              wrapped_imread('input/2019/2019-Sal18.jpg')]
 
-    rectangles = cascade.detectMultiScale(input)
-    detection_image = draw_rectangles(input, rectangles)
+    for index, input in enumerate(inputs):
+        isolated = isolate_salamander(input)
+        rectangles = cascade.detectMultiScale(isolated)
+        # give the annotation file line
+        print(f' {len(rectangles)}{ "".join([f" {x} {y} {width} {height}" for (x, y, width, height) in rectangles])}')
 
-    cv.imwrite('detection.jpg', detection_image)
+        detection_image = draw_rectangles(input, rectangles)
+
+        cv.imwrite(f'detection{index}.jpg', detection_image)

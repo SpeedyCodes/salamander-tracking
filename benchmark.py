@@ -106,16 +106,11 @@ def dot_detect_benchmark(measure, func, images, ground_truth) -> float:
     return diff_sum / len(images)
 
 
-if __name__ == '__main__':
-    from utils.heic_imread_wrapper import wrapped_imread
-
+def read_ground_truth(file: str) -> Tuple[List[np.ndarray], List[List[Tuple[int, int, int, int]]]]:
     images = []
     rectangles = []
 
-    # load the rectangles and images from annotation file with the following format:
-    # image_path amount_of_rectangles x1 y1 width1 height1 x2 y2 width2 height ...
-    #with open('benchmark_anno.txt', 'r') as file:
-    with open('training/haar_cascade/merged_annotations.txt', 'r') as file:
+    with open(file, 'r') as file:
         for line in file:
             parts = line.split(' ')
             image = wrapped_imread(parts[0])
@@ -135,14 +130,34 @@ if __name__ == '__main__':
                 image_rectangles.append((x, y, width, height))
 
             rectangles.append(image_rectangles)
+    return images, rectangles
 
-    # calculate the accuracy of the haar cascade
-    accuracy = dot_detect_benchmark(iou, dot_detect_haar, images, rectangles)
-    print(f"Accuracy with haar cascade according to iou: {accuracy}")
-    accuracy = dot_detect_benchmark(iou, threshold_adapter, images, rectangles)
-    print(f"Accuracy with threshold according to iou: {accuracy}")
-    accuracy = dot_detect_benchmark(rect_center_distance_measure, dot_detect_haar, images, rectangles)
-    print(f"Accuracy with haar cascade according to rect_center_distance_measure: {accuracy}")
-    accuracy = dot_detect_benchmark(rect_center_distance_measure, threshold_adapter, images, rectangles)
-    print(f"Accuracy with threshold according to rect_center_distance_measure: {accuracy}")
+
+if __name__ == '__main__':
+    from utils.heic_imread_wrapper import wrapped_imread
+
+    do_threshold = False
+
+    # load the rectangles and images from annotation file with the following format:
+    # image_path amount_of_rectangles x1 y1 width1 height1 x2 y2 width2 height ...
+    for path, name in [('benchmark_annos/unseen.txt', 'Never seen before'),
+                       ('benchmark_annos/previously_good.txt', 'Images that the haar cascade was originally good on'),
+                       ('training/haar_cascade/merged_annotations.txt', 'Merged original annotations')]:
+
+        print(f"Running benchmark on {name}")
+
+        images, rectangles = read_ground_truth(path)
+
+        #images = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in images]
+
+        # calculate the accuracy of the haar cascade
+        accuracy = dot_detect_benchmark(iou, dot_detect_haar, images, rectangles)
+        print(f"Accuracy with haar cascade according to iou: {accuracy}")
+        accuracy = dot_detect_benchmark(rect_center_distance_measure, dot_detect_haar, images, rectangles)
+        print(f"Accuracy with haar cascade according to rect_center_distance_measure: {accuracy}")
+        if do_threshold:
+            accuracy = dot_detect_benchmark(iou, threshold_adapter, images, rectangles)
+            print(f"Accuracy with threshold according to iou: {accuracy}")
+            accuracy = dot_detect_benchmark(rect_center_distance_measure, threshold_adapter, images, rectangles)
+            print(f"Accuracy with threshold according to rect_center_distance_measure: {accuracy}")
     
