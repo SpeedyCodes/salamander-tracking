@@ -12,18 +12,19 @@ from utils.heic_imread_wrapper import wrapped_imread
 import numpy as np
 
 
-def convert_image_to_stips_v2024(image: np.ndarray, is_show: bool = False) -> set[tuple[int, int, int, bool]]:
+def convert_image_to_stips_v2024(image: np.ndarray, is_show: bool = False) -> set[tuple[int, int, int, int, bool]]:
     """ This function will include a bunch of other functions, it will run through the entire code
 
     INPUT: image in RGB format.
     INPUT: is_show = True will show the image.
     OUTPUT: list of coordinates of the dots, these are of the form:
-    [ (x, y, radius, is_good_dot), ... ]
+    [ (x, y, w, h, is_good_dot), ... ]
     if is_good_dot is True then this is a good (green) dot, if it is false (red), then it is a false positive.
+    The dots are being stored as rectangles where (x, y) are the coordinates of the top left corner of the dot.
     """
 
     image, image_gray = preprocess_image(image, is_crop=True)
-    list_of_dots = dot_detection(image, image_gray, min_area=20, max_area=2000)
+    list_of_dots = dot_detection(image, image_gray, min_area=20, max_area=2500)
 
     if is_show:
         show_image(image, list_of_dots)
@@ -50,7 +51,7 @@ def preprocess_image(image: np.ndarray, is_crop: bool = True):
     return image, image_gray
 
 
-def dot_detection(image: np.ndarray, image_gray: np.ndarray, min_area, max_area) -> set[tuple[int, int, int, bool]]:
+def dot_detection(image: np.ndarray, image_gray: np.ndarray, min_area, max_area):
     """ This method will detect the dots on an image of a salamander and label the dots as good dots of false dots."""
 
     # Detect the largest contour in the image; this will be the body of the salamander.
@@ -78,10 +79,11 @@ def dot_detection(image: np.ndarray, image_gray: np.ndarray, min_area, max_area)
             if M['m00'] != 0:
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
-                radius = int(np.sqrt(area / np.pi))
+
+                x, y, w, h = cv.boundingRect(contour)
 
                 # Check dot's area and distance to the salamander_contour.
-                if area < 300:  # Can be changed.
+                if area < 300 or w > 2 * h or h > 2 * w or w * h > 2500:  # Can be changed.
                     distance = point_to_contour_distance((cx, cy))
                     distance_threshold = min_dim * 0.1  # Can be changed.
 
@@ -96,22 +98,22 @@ def dot_detection(image: np.ndarray, image_gray: np.ndarray, min_area, max_area)
                     is_good_dot = True
                 else:
                     is_good_dot = False
-                list_of_dots.add((cx, cy, radius, is_good_dot))
+                list_of_dots.add((x, y, w, h, is_good_dot))
 
     return list_of_dots
 
 
-def show_image(image: np.ndarray, list_of_dots: set[tuple[int, int, int, bool]]):
+def show_image(image: np.ndarray, list_of_dots):
     """ This method will show the given image with dots drawn on it. """
 
     image = cv.cvtColor(image, cv.COLOR_GRAY2BGR)
     for dot in list_of_dots:
-        cx, cy, radius, is_good_dot = dot
+        x, y, w, h, is_good_dot = dot
 
         if is_good_dot:
-            cv.circle(image, (cx, cy), radius, [0, 255, 0], -1)  # Green
+            image = cv.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
         else:
-            cv.circle(image, (cx, cy), radius, [0, 0, 255], -1)  # Red
+            image = cv.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
     cv.imshow('Image with dots', resize_with_aspect_ratio(image, height=750))
     cv.waitKey(0)
