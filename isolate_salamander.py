@@ -213,7 +213,7 @@ def filter_contours_concentric(good_contours):
     # Drawing an ellipse around the biggest contour. Now we just need to check if the other contours completely lie
     # in this ellipse. If this is True, then we remove the biggest contour.
     if len(biggest) == 4:
-        raise SystemExit('Only contour found is the trivial one, please try again with a better image!')
+        raise Exception('Only contour found is the trivial one, please try again with a better image!')
 
     assert len(biggest) >= 5, 'No good contours found!'
     ellipse = cv.fitEllipse(biggest)

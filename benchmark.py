@@ -1,5 +1,7 @@
 from typing import Tuple, List
 import numpy as np
+
+import dot_detection
 from Convert_image_to_stips import convert_image_to_coordinate_stips
 from dot_detection.dot_detect_haar import dot_detect_haar
 from math import sqrt
@@ -69,7 +71,13 @@ def dot_detect_benchmark(measure, func, images, ground_truth) -> float:
     """
     diff_sum = 0
     for index, image in enumerate(images):
-        detected_dots = func(image)  # the detected dots
+        try:
+            detected_dots = func(image)  # the detected dots
+        except Exception as e:
+            print(f"Error in image {index}: {e}")
+            diff_sum += 1
+            dot_detection.dot_detect_haar.lock.release()
+            continue
         real_rectangles = ground_truth[index]  # the dots marked manually
 
         if len(real_rectangles) == 0:
