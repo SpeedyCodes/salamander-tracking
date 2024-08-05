@@ -472,7 +472,7 @@ def display_matrix(matrix):
     plt.show()
 
 
-year = '2019'
+year = '2024'
 
 if __name__ == '__main__':
     for sal in filenames_from_folder(
@@ -480,7 +480,7 @@ if __name__ == '__main__':
         img = wrapped_imread(
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
 
-        cv.imshow('original', img)
+        cv.imshow('original', resize_with_aspect_ratio(img, height=750))
         cv.waitKey()
 
         img_isolate_new = isolate_salamander(img)
