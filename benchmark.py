@@ -4,6 +4,9 @@ from Convert_image_to_stips import convert_image_to_coordinate_stips
 from dot_detection.dot_detect_haar import dot_detect_haar
 from math import sqrt
 
+from utils import read_annotation_file
+
+
 def threshold_adapter(image: np.ndarray) -> List[Tuple[int, int, int, int]]:
     """
     :param image: the image to detect the dots in
@@ -106,33 +109,6 @@ def dot_detect_benchmark(measure, func, images, ground_truth) -> float:
     return diff_sum / len(images)
 
 
-def read_ground_truth(file: str) -> Tuple[List[np.ndarray], List[List[Tuple[int, int, int, int]]]]:
-    images = []
-    rectangles = []
-
-    with open(file, 'r') as file:
-        for line in file:
-            parts = line.split(' ')
-            image = wrapped_imread(parts[0])
-            images.append(image)
-
-            i = 0
-            count = parts[1]
-            image_rectangles = []
-
-            parts = [int(part) for part in parts[2:]]  # skip image name and count, convert to int
-
-            for i in range(int(count)):
-                x = parts[i * 4 + 0]
-                y = parts[i * 4 + 1]
-                width = parts[i * 4 + 2]
-                height = parts[i * 4 + 3]
-                image_rectangles.append((x, y, width, height))
-
-            rectangles.append(image_rectangles)
-    return images, rectangles
-
-
 if __name__ == '__main__':
     from utils.heic_imread_wrapper import wrapped_imread
 
@@ -146,7 +122,7 @@ if __name__ == '__main__':
 
         print(f"Running benchmark on {name}")
 
-        images, rectangles = read_ground_truth(path)
+        images, rectangles = read_annotation_file(path)
 
         #images = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in images]
 
