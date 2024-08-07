@@ -384,7 +384,7 @@ def rotate_image(image, x1, y1, x2, y2):
     (h, w) = image.shape[:2]
     rotated_image = cv.warpAffine(image, rotation_matrix, (w, h))
 
-    return rotated_image, orientation
+    return rotated_image, orientation, center, rotation_angle
 
 
 def contour_to_points(contour):
@@ -410,6 +410,8 @@ def find_the_belly(best_contour, image):
 
     output_image = None
     orientation = None
+    center = None
+    angle = None
     counter = 0
 
     while counter <= 1:
@@ -471,11 +473,16 @@ def find_the_belly(best_contour, image):
             output_image = put_rectangle_mask_on_image(image, rectangle_coords)
 
         if counter == 0:
-            image, orientation = rotate_image(image, x1, y1, x2, y2)
+            image, orientation, center, angle = rotate_image(image, x1, y1, x2, y2)
 
         counter += 1
 
-    return output_image
+    # Rotate the image back to its original position, this is critical for other methods relying on isolate_salamander.
+    rotation_matrix = cv.getRotationMatrix2D(center, - angle, 1.0)
+    (h, w) = image.shape[:2]
+    final_image = cv.warpAffine(output_image, rotation_matrix, (w, h))
+
+    return final_image
 
 
 def draw_best_contour(best_contour, image):
