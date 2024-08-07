@@ -8,13 +8,19 @@ After that, we will try to remove some parts of the background.
 
 import cv2 as cv
 import numpy as np
+import largestinteriorrectangle as lir
 
 
-def isolate_salamander(image: np.array) -> np.array:
+def isolate_salamander(image: np.array, is_old_and_new: bool = False) -> np.array:
     """ This function will include a bunch of other functions, it will return a black image with only the salamander.
 
     INPUT: numpy array image, this must! be in BGR format, this type of image can be obtained by wrapped_imread.
-    OUTPUT: numpy array image."""
+    INPUT: if is_old_and_new is True, it will return the old isolate salamander and the new cropped version of
+    the belly. Otherwise, if false, then it will just return the new cropped version of the belly.
+    OUTPUT: if is_old_and_new is True, then it will return two images:
+    First the new cropped version of the belly, then the old isolate salamander.
+    Otherwise, it will only return the new cropped version of the belly.
+    In all cases, the output images are numpy array images."""
 
     # First, detect the salamander (and mask) with color segmentation, thus there will be some noise left.
     image_isolated_salamander_with_noise, mask = color_segmentation(image, ksize=51, lower_bound=[5, 50, 50],
@@ -34,10 +40,14 @@ def isolate_salamander(image: np.array) -> np.array:
     best_contour = select_best_contour(filtered_contours, central_x, central_y, contour_with_largest_area)
 
     # Only use the best contour for the final image.
-    image_isolated_salamander_without_noise = draw_best_contour(best_contour,
-                                                                image_isolated_salamander_with_noise)
+    image_belly = find_the_belly(best_contour, image_isolated_salamander_with_noise)
 
-    return image_isolated_salamander_without_noise
+    if is_old_and_new:
+        image_isolated_salamander_without_noise = draw_best_contour_old(best_contour,
+                                                                        image_isolated_salamander_with_noise)
+
+        return image_isolated_salamander_without_noise, image_belly
+    return image_belly
 
 
 def color_segmentation(image, ksize, lower_bound, upper_bound):
@@ -309,7 +319,115 @@ def select_best_contour(good_contours, central_x, central_y, biggest_contour):
     return closest_contour
 
 
-def draw_best_contour(best_contour, image):
+def put_rectangle_mask_on_image(image, rectangle_coords):
+    """ This method removes some parts of the image, using a rectangle mask."""
+
+    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+
+    # Create a mask with the same dimensions as the image, initialized to black (0).
+    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+
+    # Draw the rectangle on the mask.
+    cv.fillPoly(mask, [rectangle_coords], (255, 255, 255))
+
+    # Only keep the part of the original image that is in the mask.
+    masked_image = cv.bitwise_and(image_gray, mask)
+    mask = masked_image > 0
+    output_image = np.zeros_like(image)
+    output_image[mask] = image[mask]
+
+    return output_image
+
+
+def rotate_image(image, x1, y1, x2, y2):
+    """ This method rotates the image such that the salamander is lying parallel with the vertical axis."""
+
+    # The points describe a rectangle, now first make this rectangle bigger.
+    factor = 0.1
+    x1 = x1 - x1 * factor
+    y1 = y1 - y1 * factor
+    x2 = x2 + x2 * factor
+    y2 = y2 + y2 * factor
+
+    # Now generate an image that has a bit less background removed (since the rectangle is bigger).
+    big_rectangle_coords = np.array([(x1, y1), (x1, y2), (x2, y2), (x2, y1)], dtype=np.int32)
+    image_with_less_crop = put_rectangle_mask_on_image(image, big_rectangle_coords)
+
+    # Now detect the body of the salamander.
+    image_with_less_crop_gray = cv.cvtColor(image_with_less_crop, cv.COLOR_BGR2GRAY)
+    contours, _ = cv.findContours(image_with_less_crop_gray, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    salamander_contour = max(contours, key=cv.contourArea)
+
+    # Draw an ellipse around the body of the salamander.
+    ellipse = cv.fitEllipse(salamander_contour)
+    center, axes, angle = ellipse
+
+    # If the orientation of the ellipse is closer to the x-axis, then rotate such that the ellipse is parallel with
+    # the x-axis. And same reasoning for the y-axis.
+    if angle < 45 or angle > 135:  # Closer to the y-axis.
+        rotation_angle = angle
+    else:  # Closer to the x-axis.
+        rotation_angle = -(90 - angle)
+
+    # Do the rotation.
+    rotation_matrix = cv.getRotationMatrix2D(center, rotation_angle, 1.0)
+    (h, w) = image.shape[:2]
+    rotated_image = cv.warpAffine(image, rotation_matrix, (w, h))
+
+    return rotated_image
+
+
+def contour_to_points(contour):
+    """ This method will transform the contour in to a new datatype that is more suitable for further progress."""
+
+    contour_points = []
+    for big_list in contour:
+        for point in big_list:
+            contour_points.append(point)
+    contour_points = np.array([contour_points], np.int32)
+
+    return contour_points
+
+
+def find_the_belly(best_contour, image):
+    """ This method will try to crop the image even more, such that we can only see the belly of the salamander.
+    First we will try to do detect the belly, but the salamander can be a bit rotated, that is why we need to rotate
+    it back to a standardised pose (we do this by using the first try of finding the belly).
+    Finally, we can try to find the belly again. """
+
+    output_image = None
+    counter = 0
+
+    while counter <= 1:
+
+        contour_points = contour_to_points(best_contour)
+
+        # Find a rectangle inside the contour.
+        rectangle = lir.lir(contour_points)
+
+        (x1, y1) = lir.pt1(rectangle)  # Upper left point.
+        (x2, y2) = lir.pt2(rectangle)  # Lower right point.
+
+        extra = 0.05 * x1  # Originally, extra had a value of 20 but a more dependent factor seemed better.
+        x1 = x1 - extra
+        y1 = y1 - extra
+        x2 = x2 + extra
+        y2 = y2 + extra
+
+        rectangle_coords = np.array([(x1, y1), (x1, y2), (x2, y2), (x2, y1)], dtype=np.int32)
+
+        output_image = put_rectangle_mask_on_image(image, rectangle_coords)
+
+        if counter == 0:
+
+            image = rotate_image(image, x1, y1, x2, y2)
+
+        counter += 1
+
+    return output_image
+
+
+def draw_best_contour_old(best_contour, image):
     """ This method will make a mask from the best contour and draw it on the original image."""
 
     # Create a mask for the selected contour
@@ -326,3 +444,17 @@ def draw_best_contour(best_contour, image):
     image = cv.bitwise_and(image, image, mask=mask)
 
     return image
+
+
+def resize(image, width=None, height=750, inter=cv.INTER_AREA):
+    """ Resizes the image with aspect ratio equal to width and height. """
+    (h, w) = image.shape[:2]
+    if width is None and height is None:
+        return image
+    if width is None:
+        r = height / float(h)
+        dim = (int(w * r), height)
+    else:
+        r = width / float(w)
+        dim = (width, int(h * r))
+    return cv.resize(image, dim, interpolation=inter)

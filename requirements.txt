@@ -4,3 +4,4 @@ matplotlib
 pillow-heif
 flask
 tqdm
+largestinteriorrectangle
