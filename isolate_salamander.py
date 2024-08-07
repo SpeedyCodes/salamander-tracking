@@ -39,14 +39,13 @@ def isolate_salamander(image: np.array, is_old_and_new: bool = False) -> np.arra
                                                                    central_x=central_x, central_y=central_y)
     best_contour = select_best_contour(filtered_contours, central_x, central_y, contour_with_largest_area)
 
-    # Only use the best contour for the final image.
-    image_belly = find_the_belly(best_contour, image_isolated_salamander_with_noise)
+    # Isolate the whole salamander from the background.
+    image_isolated_without_noise = draw_best_contour(best_contour, image_isolated_salamander_with_noise)
 
+    # Try to find the belly of the salamander.
+    image_belly = find_the_belly(best_contour, image_isolated_without_noise)
     if is_old_and_new:
-        image_isolated_salamander_without_noise = draw_best_contour_old(best_contour,
-                                                                        image_isolated_salamander_with_noise)
-
-        return image_isolated_salamander_without_noise, image_belly
+        return image_isolated_without_noise, image_belly
     return image_belly
 
 
@@ -340,7 +339,10 @@ def put_rectangle_mask_on_image(image, rectangle_coords):
 
 
 def rotate_image(image, x1, y1, x2, y2):
-    """ This method rotates the image such that the salamander is lying parallel with the vertical axis."""
+    """ This method rotates the image such that the salamander.
+    Either of two scenarios is given back as output, depending on how the salamanders body was positioned originally.
+    1. The salamander lies parallel to the x-axis with the head to the right.
+    2. The salamander lies parallel to the y-axis with the head to the top."""
 
     # The points describe a rectangle, now first make this rectangle bigger.
     factor = 0.1
@@ -363,18 +365,26 @@ def rotate_image(image, x1, y1, x2, y2):
     center, axes, angle = ellipse
 
     # If the orientation of the ellipse is closer to the x-axis, then rotate such that the ellipse is parallel with
-    # the x-axis. And same reasoning for the y-axis.
-    if angle < 45 or angle > 135:  # Closer to the y-axis.
+    # the x-axis. And same reasoning for the y-axis. But we make sure that (if the salamander was originally with the
+    # head pointing to the top or to the right) the head is again pointing to the top or to the right.
+    if angle < 45:  # Closer to the y-axis.
         rotation_angle = angle
+        orientation = 'vertical'
+
+    elif angle > 135:  # Closer to the y-axis.
+        rotation_angle = - (180 - angle)
+        orientation = 'vertical'
+
     else:  # Closer to the x-axis.
-        rotation_angle = -(90 - angle)
+        rotation_angle = - (90 - angle)
+        orientation = 'horizontal'
 
     # Do the rotation.
     rotation_matrix = cv.getRotationMatrix2D(center, rotation_angle, 1.0)
     (h, w) = image.shape[:2]
     rotated_image = cv.warpAffine(image, rotation_matrix, (w, h))
 
-    return rotated_image
+    return rotated_image, orientation
 
 
 def contour_to_points(contour):
@@ -393,14 +403,43 @@ def find_the_belly(best_contour, image):
     """ This method will try to crop the image even more, such that we can only see the belly of the salamander.
     First we will try to do detect the belly, but the salamander can be a bit rotated, that is why we need to rotate
     it back to a standardised pose (we do this by using the first try of finding the belly).
-    Finally, we can try to find the belly again. """
+    Finally, we can try to find the belly again.
+
+    INPUT: image is the isolated image.
+    INPUT: best_contour is the contour surrounding this isolated image. """
 
     output_image = None
+    orientation = None
     counter = 0
 
     while counter <= 1:
+        # First loop: detect the orientation of the salamander.
+        # Second loop: cut of the head, paws and tail of the salamander.
 
-        contour_points = contour_to_points(best_contour)
+        if counter == 0:
+            contour_points = contour_to_points(best_contour)
+        else:
+            image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+            best_contour, _ = cv.findContours(image_gray, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+            best_contour = max(best_contour, key=cv.contourArea)
+            contour_points = contour_to_points(best_contour)
+
+        if counter == 1:  # Cutting of the head of the salamander.
+            if orientation == 'horizontal':
+                x, y, w, h = cv.boundingRect(best_contour)
+                cut_of_range = int(w * 0.2)  # Cutting of a percentage of the right side of the image.
+                image[y:y + h, x + w - cut_of_range:x + w] = (0, 0, 0)
+
+            if orientation == 'vertical':
+                x, y, w, h = cv.boundingRect(best_contour)
+                cut_of_range = int(h * 0.2)  # Cutting of a percentage of the top side of the image.
+                image[y:y + cut_of_range, x:x + w] = (0, 0, 0)
+
+            # Now again, find the contour surrounding the salamander (without the head hopefully).
+            image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+            best_contour, _ = cv.findContours(image_gray, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+            best_contour = max(best_contour, key=cv.contourArea)
+            contour_points = contour_to_points(best_contour)
 
         # Find a rectangle inside the contour.
         rectangle = lir.lir(contour_points)
@@ -409,30 +448,42 @@ def find_the_belly(best_contour, image):
         (x2, y2) = lir.pt2(rectangle)  # Lower right point.
 
         extra = 0.05 * x1  # Originally, extra had a value of 20 but a more dependent factor seemed better.
-        x1 = x1 - extra
-        y1 = y1 - extra
-        x2 = x2 + extra
-        y2 = y2 + extra
+        # Here, we try to enlarge the rectangle a bit to make sure that most of the belly is enclosed in the rectangle.
+        if orientation is None:
+            x1 = x1 - extra
+            y1 = y1 - extra
+            x2 = x2 + extra
+            y2 = y2 + extra
+        elif orientation == 'vertical':
+            x1 = x1 - extra
+            y1 = y1 + extra
+            x2 = x2 + extra
+            y2 = y2 - extra
+        elif orientation == 'horizontal':
+            x1 = x1 + extra
+            y1 = y1 - extra
+            x2 = x2 - extra
+            y2 = y2 + extra
 
         rectangle_coords = np.array([(x1, y1), (x1, y2), (x2, y2), (x2, y1)], dtype=np.int32)
 
-        output_image = put_rectangle_mask_on_image(image, rectangle_coords)
+        if counter == 1:
+            output_image = put_rectangle_mask_on_image(image, rectangle_coords)
 
         if counter == 0:
-
-            image = rotate_image(image, x1, y1, x2, y2)
+            image, orientation = rotate_image(image, x1, y1, x2, y2)
 
         counter += 1
 
     return output_image
 
 
-def draw_best_contour_old(best_contour, image):
+def draw_best_contour(best_contour, image):
     """ This method will make a mask from the best contour and draw it on the original image."""
 
     # Create a mask for the selected contour
-
-    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    height, width = image.shape[:2]
+    mask = np.zeros((height, width), dtype=np.uint8)
     cv.drawContours(mask, [best_contour], -1, [255], thickness=cv.FILLED)
 
     # Apply additional morphological operations like before.
