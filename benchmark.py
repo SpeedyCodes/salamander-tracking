@@ -126,6 +126,7 @@ if __name__ == '__main__':
     # image_path amount_of_rectangles x1 y1 width1 height1 x2 y2 width2 height ...
     for path, name in [('benchmark_annos/unseen.txt', 'Never seen before'),
                        ('benchmark_annos/previously_good.txt', 'Images that the haar cascade was originally good on'),
+                       ('benchmark_annos/perfectly_tuned_thresh.txt', 'Images that thresholding was tuned for'),
                        ('training/haar_cascade/merged_annotations.txt', 'Merged original annotations')]:
 
         print(f"Running benchmark on {name}")
