@@ -161,7 +161,7 @@ def draw_contours(image, img_th_global):
     thickness = 4
     color = (255, 0, 255)
     cv.drawContours(image_copy, contours, index, color, thickness)  # Draw the contours on the copied image.
-    image_rescale = resize_with_aspect_ratio(image_copy, height=750)
+    image_rescale = resize_with_aspect_ratio(image_copy)
     return image_rescale
 
 
@@ -480,11 +480,11 @@ if __name__ == '__main__':
         img = wrapped_imread(
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
 
-        cv.imshow('original', resize_with_aspect_ratio(img, height=750))
+        cv.imshow('original', resize_with_aspect_ratio(img))
         cv.waitKey()
 
         img_isolate_new = isolate_salamander(img)
-        cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new, height=750, width=500))
+        cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new))
         cv.waitKey(0)
 
         """ Loading in the image."""
@@ -506,11 +506,11 @@ if __name__ == '__main__':
             img_blur = pre_processing(img, 7, None, True)
             cv.imshow('Pre-processing', img_blur)
             _, img_blur_global = cv.threshold(img_blur, 110, 255, cv.THRESH_BINARY)
-            cv.imshow('Binaire', resize_with_aspect_ratio(img_blur_global, height=750))
+            cv.imshow('Binaire', resize_with_aspect_ratio(img_blur_global))
 
             """ Isolating central object."""
             isolate_img = isolate_central_object(img_blur_global)
-            cv.imshow('Isolated', resize_with_aspect_ratio(isolate_img, height=750))
+            cv.imshow('Isolated', resize_with_aspect_ratio(isolate_img))
             cv.waitKey(0)
             cv.destroyAllWindows()
 
@@ -519,19 +519,19 @@ if __name__ == '__main__':
 
         """ Cropping the image."""
         img_crop_original_size = crop_detailed_image_original_size(th_mean, isolate_img)
-        cv.imshow('Cropped_original_size', resize_with_aspect_ratio(img_crop_original_size, height=750))
+        cv.imshow('Cropped_original_size', resize_with_aspect_ratio(img_crop_original_size))
         img_crop = crop_detailed_image_small_size(img_crop_original_size)
         cv.waitKey()
-        cv.imshow('Cropped', resize_with_aspect_ratio(img_crop, height=750))
+        cv.imshow('Cropped', resize_with_aspect_ratio(img_crop))
 
         """ Post-processing of the image."""
         img_post_proc = post_processing(img_crop, 5, 180)
-        cv.imshow('Image post-processing', resize_with_aspect_ratio(img_post_proc, height=750))
+        cv.imshow('Image post-processing', resize_with_aspect_ratio(img_post_proc))
 
         """ Detecting the dots."""
         dots = detect_dots(img_post_proc)
         img_dots = draw_dots(img_crop, dots)
-        cv.imshow('Dots', resize_with_aspect_ratio(img_dots, height=750, width=300))
+        cv.imshow('Dots', resize_with_aspect_ratio(img_dots))
 
         """ Representing the good dots in a matrix and showing this matrix."""
         matrix_with_dots = image_to_matrix(img_dots, dots)

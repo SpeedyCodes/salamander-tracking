@@ -44,7 +44,7 @@ def filenames_from_folder(folder: str) -> set:
     return list_of_images
 
 
-def resize_with_aspect_ratio(image, width=None, height=None, inter=cv.INTER_AREA):
+def resize_with_aspect_ratio(image, width=500, height=750, inter=cv.INTER_AREA):
     """ Resizes the image with aspect ratio equal to width and height. """
     (h, w) = image.shape[:2]
     if width is None and height is None:

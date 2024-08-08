@@ -117,7 +117,7 @@ def show_image(image: np.ndarray, list_of_dots):
         else:
             image = cv.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
-    cv.imshow('Image with dots', resize_with_aspect_ratio(image, height=750))
+    cv.imshow('Image with dots', resize_with_aspect_ratio(image))
     cv.waitKey(0)
     cv.destroyAllWindows()
     return None
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         img = wrapped_imread(
             f'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/{year}/{sal}')
 
-        cv.imshow('original', resize_with_aspect_ratio(img, height=750))
+        cv.imshow('original', resize_with_aspect_ratio(img))
         cv.waitKey()
 
         list_dots = convert_image_to_stips_v2024(img, is_show=True)
