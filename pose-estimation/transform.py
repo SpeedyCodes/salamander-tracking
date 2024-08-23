@@ -1,3 +1,4 @@
+from math import floor, ceil
 from typing import Dict, Tuple
 
 import numpy as np
@@ -110,12 +111,23 @@ class CoordinateTransformer:
         closest_point = (int(x_t[closest_point_index]), int(y_t[closest_point_index]))
         distance = distances[closest_point_index]
 
-        # get the length of spline between the closest point and the spine_middle
+        # compute the sign of the distance
         closest_point_t = t[closest_point_index]
+        lower_t_bound = floor(closest_point_t)
+        upper_t_bound = ceil(closest_point_t)
+        lower_bound_coords = (self.xPoly(lower_t_bound), self.yPoly(lower_t_bound))
+        upper_bound_coords = (self.xPoly(upper_t_bound), self.yPoly(upper_t_bound))
+        lower_to_upper = upper_bound_coords[0] - lower_bound_coords[0], upper_bound_coords[1] - lower_bound_coords[1]
+        lower_to_closest = x - lower_bound_coords[0], y - lower_bound_coords[1]
+
+        sign = np.sign(np.cross(lower_to_closest, lower_to_upper))
+        distance *= sign
+
+        # get the length of spline between the closest point and the spine_middle
         spine_part_needed = closest_point_t / (len(self.used_points) - 1)
         full_spine_length = self.y_remapped.max() - self.y_remapped.min()
         spine_length = spine_part_needed * full_spine_length
-        new_point_x = self.x_remapped[self.middle_point_t] - distance  # TODO compute sign of distance
+        new_point_x = self.x_remapped[self.middle_point_t] + distance
         new_point_y = self.y_remapped.min() + spine_length
 
         # TODO removeme
