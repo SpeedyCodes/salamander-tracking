@@ -9,3 +9,4 @@ training/haar_cascade/positive_samples.dat
 training/haar_cascade/cascade/stage*.xml
 training/haar_cascade/cascade/params.xml
 __pycache__
+labeled-data

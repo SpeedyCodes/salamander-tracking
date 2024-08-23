@@ -1,7 +1,12 @@
 opencv-python
 numpy
-matplotlib
+matplotlib<3.9
 pillow-heif
 flask
 tqdm
 largestinteriorrectangle
+deeplabcut[tf]
+keras==2.12.0
+typing-extensions>=4.6
+torch
+scipy

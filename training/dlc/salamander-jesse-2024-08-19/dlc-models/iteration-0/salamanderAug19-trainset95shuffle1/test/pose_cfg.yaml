@@ -1,0 +1,42 @@
+all_joints:
+- - 0
+- - 1
+- - 2
+- - 3
+- - 4
+- - 5
+- - 6
+- - 7
+- - 8
+- - 9
+- - 10
+- - 11
+- - 12
+- - 13
+- - 14
+- - 15
+all_joints_names:
+- head_tip
+- left_shoulder
+- left_hand_middle
+- right_shoulder
+- right_hand_middle
+- left_pelvis
+- left_foot_middle
+- right_pelvis
+- right_foot_middle
+- tail_connection
+- tail_end
+- spine_highest
+- spine_high
+- spine_middle
+- spine_low
+- spine_lowest
+dataset: training-datasets\iteration-0\UnaugmentedDataSet_salamanderAug19\salamander_jesse95shuffle1.mat
+global_scale: 0.8
+init_weights: d:\school\uantwerpen\honours\salamander\salamander-tracking\training\dlc\venv\lib\site-packages\deeplabcut\pose_estimation_tensorflow\models\pretrained\resnet_v1_50.ckpt
+location_refinement: true
+locref_stdev: 7.2801
+net_type: resnet_50
+num_joints: 16
+scoremap_dir: test

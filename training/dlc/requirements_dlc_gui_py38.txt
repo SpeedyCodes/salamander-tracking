@@ -1,0 +1,6 @@
+deeplabcut[tf,gui]
+keras==2.10.0
+typing-extensions>=4.6
+torch
+wxpython==4.0.7.post2
+tensorflow==2.10.0
