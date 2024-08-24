@@ -1,0 +1,1 @@
+from src.background_removal.isolate_salamander import isolate_salamander

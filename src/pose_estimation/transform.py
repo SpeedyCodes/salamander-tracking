@@ -132,21 +132,24 @@ class CoordinateTransformer:
 
         # TODO removeme
         cv2.circle(image, closest_point, 5, (0, 255, 0), -1)
+        cv2.putText(image, "closest point on spine", closest_point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.line(image, (x, y), closest_point, (0, 255, 0))
-        cv2.circle(image, (int(new_point_x), int(new_point_y)), 5, (0, 255, 255), -1)
+        cv2.circle(image, (int(new_point_x), int(new_point_y)), 5, (0, 0, 0), -1)
+        cv2.putText(image, "new", (int(new_point_x), int(new_point_y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
         return new_point_x, new_point_y
 
 
 
 if __name__ == "__main__":
-    image = cv2.imread("pose-estimation/testdata/2022-Sal59.jpg")
+    image = cv2.imread("src/pose_estimation/testdata/2022-Sal59.jpg")
     input = {'head_tip': (175, 34, 0.9991191029548645), 'left_shoulder': (166, 251, 0.9292972087860107), 'left_hand_middle': (77, 347, 0.5459177494049072), 'right_shoulder': (292, 255, 0.9942055344581604), 'right_hand_middle': (455, 347, 0.3259645402431488), 'left_pelvis': (263, 671, 0.9855242371559143), 'left_foot_middle': (154, 845, 0.44996482133865356), 'right_pelvis': (328, 571, 0.9363328814506531), 'right_foot_middle': (386, 463, 0.9253280162811279), 'tail_connection': (350, 714, 0.9914472103118896), 'tail_end': (179, 748, 0.025986261665821075), 'spine_highest': (227, 262, 0.9916161298751831), 'spine_high': (230, 317, 0.7306284308433533), 'spine_middle': (235, 410, 0.7062945365905762), 'spine_low': (249, 513, 0.9910240173339844), 'spine_lowest': (275, 595, 0.897484540939331)}
 
     point = 240, 550
 
     cv2.circle(image, point, 5, (0, 0, 255), -1)
+    cv2.putText(image, "original", (point[0]-30, point[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     transformer = CoordinateTransformer(input)
 
-    transformer.transform(*point)
+    x, y =transformer.transform(*point)
     transformer.show_interpolation(image)

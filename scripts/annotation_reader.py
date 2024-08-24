@@ -1,7 +1,7 @@
 from typing import Tuple, List
 import numpy as np
 
-from utils import wrapped_imread
+from src.utils import wrapped_imread
 def read_annotation_file(file: str) -> Tuple[List[np.ndarray], List[List[Tuple[int, int, int, int]]]]:
     images = []
     rectangles = []

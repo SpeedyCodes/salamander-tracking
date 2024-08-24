@@ -1,12 +1,12 @@
 from typing import Tuple, List
 import numpy as np
 
-import dot_detection
-from Convert_image_to_stips import convert_image_to_coordinate_stips
-from dot_detection.dot_detect_haar import dot_detect_haar
+from src import dot_detection
+from src.dot_detection import convert_image_to_coordinate_stips
+from src.dot_detection import dot_detect_haar
 from math import sqrt
 
-from utils import read_annotation_file
+from annotation_reader import read_annotation_file
 
 
 def threshold_adapter(image: np.ndarray) -> List[Tuple[int, int, int, int]]:
@@ -118,15 +118,14 @@ def dot_detect_benchmark(measure, func, images, ground_truth) -> float:
 
 
 if __name__ == '__main__':
-    from utils.heic_imread_wrapper import wrapped_imread
 
     do_threshold = False
 
     # load the rectangles and images from annotation file with the following format:
     # image_path amount_of_rectangles x1 y1 width1 height1 x2 y2 width2 height ...
-    for path, name in [('benchmark_annos/unseen.txt', 'Never seen before'),
-                       ('benchmark_annos/previously_good.txt', 'Images that the haar cascade was originally good on'),
-                       ('benchmark_annos/perfectly_tuned_thresh.txt', 'Images that thresholding was tuned for'),
+    for path, name in [('dot_benchmark_annotations/unseen.txt', 'Never seen before'),
+                       ('dot_benchmark_annotations/previously_good.txt', 'Images that the haar cascade was originally good on'),
+                       ('dot_benchmark_annotations/perfectly_tuned_thresh.txt', 'Images that thresholding was tuned for'),
                        ('training/haar_cascade/merged_annotations.txt', 'Merged original annotations')]:
 
         print(f"Running benchmark on {name}")

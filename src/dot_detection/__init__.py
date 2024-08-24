@@ -1,0 +1,3 @@
+from src.dot_detection.Convert_image_to_stips_v2024 import convert_image_to_stips_v2024
+from src.dot_detection.Convert_image_to_stips import convert_image_to_coordinate_stips
+from src.dot_detection.dot_detect_haar import dot_detect_haar

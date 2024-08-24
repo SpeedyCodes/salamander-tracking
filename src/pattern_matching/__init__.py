@@ -1,0 +1,1 @@
+from .Compare_dot_patterns import compare_dot_patterns

@@ -19,8 +19,8 @@ This is done in several steps:
 8. Displaying the best matches to the user.
 """
 
-from dot_detection.dot_detect_haar import dot_detect_haar
-from isolate_salamander import isolate_salamander
+from src.dot_detection import dot_detect_haar
+from src.background_removal import isolate_salamander
 from tqdm import tqdm
 import cv2 as cv
 import numpy as np

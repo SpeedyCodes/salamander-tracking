@@ -29,11 +29,11 @@ quality and can easily detect false positive dots.
 """
 
 import cv2 as cv
-from Generating_extra_data import filenames_from_folder, resize_with_aspect_ratio
-from isolate_salamander import isolate_salamander
+from scripts.Generating_extra_data import filenames_from_folder, resize_with_aspect_ratio
+from src.background_removal import isolate_salamander
 from matplotlib import pyplot as plt
 import numpy as np
-from utils.heic_imread_wrapper import wrapped_imread
+from src.utils import wrapped_imread
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.

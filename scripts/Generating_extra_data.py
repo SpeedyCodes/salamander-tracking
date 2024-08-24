@@ -9,7 +9,7 @@ import math
 import cv2 as cv
 import os
 import random
-from utils.heic_imread_wrapper import wrapped_imread
+from src.utils import wrapped_imread
 
 """ User input """
 save_to_computer: bool = False  # Put this on True if you want to save the images while running this file.

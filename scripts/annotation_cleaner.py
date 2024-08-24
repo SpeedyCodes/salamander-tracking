@@ -1,8 +1,8 @@
-from utils import read_annotation_file
+from annotation_reader import read_annotation_file
 import cv2
 from Generating_extra_data import resize_with_aspect_ratio
 
-file_to_clean = 'benchmark_annos/previously_good.txt'
+file_to_clean = '../dot_benchmark_annotations/previously_good.txt'
 
 images, rectangles = read_annotation_file(file_to_clean)
 

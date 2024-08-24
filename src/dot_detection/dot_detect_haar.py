@@ -1,6 +1,6 @@
 import cv2 as cv
-from utils.heic_imread_wrapper import wrapped_imread
-from isolate_salamander import isolate_salamander
+from src.utils import wrapped_imread
+from src.background_removal import isolate_salamander
 import threading
 
 

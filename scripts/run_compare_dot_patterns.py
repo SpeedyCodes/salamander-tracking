@@ -1,6 +1,6 @@
-from Generating_extra_data import filenames_from_folder
-from utils.heic_imread_wrapper import wrapped_imread
-from Compare_dot_patterns import compare_dot_patterns
+from scripts.Generating_extra_data import filenames_from_folder
+from src.utils import wrapped_imread
+from src.pattern_matching import compare_dot_patterns
 from time import time
 
 database = []
