@@ -21,10 +21,10 @@ cascade = cv.CascadeClassifier('training/haar_cascade/cascade/cascade.xml')
 
 def dot_detect_haar(image):
     lock.acquire()
-    image = isolate_salamander(image)
     output = cascade.detectMultiScale(image)
     lock.release()
     return output
+
 
 if __name__ == '__main__':
     inputs = [wrapped_imread('input/2024/IMG_3023.jpeg'),

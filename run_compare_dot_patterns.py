@@ -4,7 +4,7 @@ from Compare_dot_patterns import compare_dot_patterns
 from time import time
 
 database = []
-year_list = ['2018/', '2019/', '2021/', '2022/', '2024/', 'Online/']
+year_list = ['2018/', '2019/', '2021/', '2022/', '2024/']
 location = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
 if __name__ == '__main__':
     for year in year_list:
