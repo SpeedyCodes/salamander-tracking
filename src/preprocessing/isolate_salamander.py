@@ -516,3 +516,20 @@ def resize(image, width=None, height=750, inter=cv.INTER_AREA):
         r = width / float(w)
         dim = (width, int(h * r))
     return cv.resize(image, dim, interpolation=inter)
+
+
+def crop_image(image):
+    """ This method will literally crop the image. So we remove the non-interesting, white background. """
+
+    try:
+        image = isolate_salamander(image)
+    except:
+        return image
+    else:
+        image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        x, y, w, h = cv.boundingRect(image_gray)
+
+        # Now crop the image to the bounding box.
+        cropped_image = image[y: y + h, x: x + w]
+
+        return cropped_image

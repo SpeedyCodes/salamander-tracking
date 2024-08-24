@@ -19,8 +19,6 @@ This is done in several steps:
 8. Displaying the best matches to the user.
 """
 
-from src.dot_detection import dot_detect_haar
-from src.background_removal import isolate_salamander
 from tqdm import tqdm
 import cv2 as cv
 import numpy as np
@@ -30,15 +28,17 @@ import itertools
 import copy
 from time import time
 import threading
+from typing import List, Tuple, Set
 
 
-def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str]], tol: float = 0.01,
-                         is_second_run: bool = True, plot_r_values: bool = False,
-                         thread_counts: tuple[int, int] = (8, 1)):
+def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
+                         database_of_coordinates: List[Tuple[Set[Tuple[float, float]], str]],
+                         tol: float = 0.01, is_second_run: bool = True, plot_r_values: bool = False,
+                         thread_count: int = 1):
     """ This function will include a bunch of other functions ...
 
-    INPUT: image denotes the unknown image, this is the image we want to compare with our database.
-    INPUT: database is a set of tuples (image, name) that represents all the items of our database.
+    INPUT: unknown_image_coordinates contains the coordinates of the image we want to compare with our database.
+    INPUT: database_of_coordinates is a list of tuples(coords, name) that represents all the items of our database.
     INPUT: the tolerance tol is a parameter that the user is free to set. If detected dots have distance less than
     a scaler multiplied by tol, then we consider these dots as one. (We remove one of the two dots, this ensures that
     the numerical computations are stable).
@@ -46,51 +46,15 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
     algorithm. A second run ensures that the matches are of higher quality, but at the cost of a higher chance of
     missing True matches.
     INPUT: plot_r_values is a boolean that determines whether to plot the r_values in a histogram.
-    OUTPUT: a plot with the three highest matches from the database. """
+    OUTPUT: a sorted list of scores. """
 
-    loading_bar = tqdm(total=len(database) + 1)  # Keeps track on how far the algorithm is.
+    loading_bar = tqdm(total=len(database_of_coordinates) + 1)  # Keeps track on how far the algorithm is.
 
     list_of_scores = []  # Will include all the images in the database and their matching score with the unknown image.
 
-    # First, crop the image to the essential part.
-    image_crop = crop_image(image)
+    # Select the points to be used from the coordinates of the unknown image
+    list_coordinates = select_points_to_be_matched(unknown_image_coordinates, tol=3 * tol)
 
-    # Second, load in the list of coordinates of the unknown image and select the points to be used.
-    list_coordinates = load_in_coordinates(image_crop)
-    list_coordinates = select_points_to_be_matched(list_coordinates, tol=3 * tol)
-
-    # Then, transform the database of images to a database of lists of coordinates with a name tag.
-    database_of_coordinates = []  # type = set[ list[ set[tuple[float, float] ], str ].
-    # Essentially this is of the form set[ list[ list_of_coordinates, name_tag ] ]
-
-    start_time = time()
-    threads = []
-    thread_count = thread_counts[0]
-
-    def image_to_coords(image_from_database, name_image_from_database):
-        image_from_database = crop_image(image_from_database)
-        list_coordinates_image_from_database = load_in_coordinates(image_from_database)
-        list_coordinates_image_from_database = select_points_to_be_matched(list_coordinates_image_from_database, tol=3 * tol)
-        database_of_coordinates.append([list_coordinates_image_from_database, name_image_from_database])
-
-    if thread_count == 1:  # no threading
-        for image_database, name_image_database in database:
-            image_to_coords(image_database, name_image_database)
-    else:  # threaded execution
-        def thread_function(start, end):
-            for j in range(start, end):
-                image_to_coords(database[j][0], database[j][1])
-
-        for i in range(thread_count):
-            threads.append(threading.Thread(target=thread_function, args=(
-                i * len(database) // thread_count, (i + 1) * len(database) // thread_count)))
-            threads[-1].start()
-
-        for thread in threads:
-            thread.join()
-
-    print(f"Time for loading DB: {time() - start_time} seconds")
-    loading_bar.update(1)
 
     start_time = time()
 
@@ -119,7 +83,6 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
         list_of_scores.append((S1, S1_rel, S2, keyword, name_image_from_database))
 
     threads = []
-    thread_count = thread_counts[1]
 
     # Start matching procedure for every image in the database.
     if thread_count == 1:  # no threading
@@ -142,8 +105,11 @@ def compare_dot_patterns(image: np.ndarray, database: list[tuple[np.ndarray, str
             thread.join()
 
     print(f"Time for matching procedure: {time() - start_time} seconds ---")
-    # Plotting the results.
-    list_of_scores = display_results(image, database, list_of_scores)
+
+    # Sort the list_of_scores based on highest combined score.
+    weight_S1 = 0.3
+    weight_S2 = 0.7
+    list_of_scores = sort_list_of_scores(list_of_scores, weight_S1, weight_S2)
 
     return list_of_scores
 
@@ -186,80 +152,6 @@ def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol
 
     return matched_points, V, f_t, V_max
 
-
-def crop_image(image):
-    """ This method will literally crop the image. So we remove the non-interesting, white background. """
-
-    try:
-        image = isolate_salamander(image)
-    except:
-        return image
-    else:
-        image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-        x, y, w, h = cv.boundingRect(image_gray)
-
-        # Now crop the image to the bounding box.
-        cropped_image = image[y: y + h, x: x + w]
-
-        return cropped_image
-
-
-""" STEP 0: Loading in the list of coordinates/points. """
-
-
-def calculate_centroid_of_rectangle(x, y, width, height):
-    """ This method calculates the centroid coordinates of a rectangle, given that the origin is at the top left
-    of the image and given the parameters (x, y, width, height),
-    where (x, y) is the coordinate of the top left corner of the rectangle and width is the horizontal length of the
-    rectangle and height is the vertical length of the rectangle."""
-
-    return (x + width / 2), (y + height / 2)
-
-
-def normalisation_of_coordinates(x, y, width_image, height_image):
-    """ This method normalizes the coordinates of a rectangle to the [0, 1] interval,
-    given that the origin is at the top left."""
-
-    return x / width_image, y / height_image
-
-
-def transform_origin(x, y):
-    """ This method transforms the coordinates of a rectangle to a new origin, located at the bottom left of the
-    image, not the top left of the image. We assume that the coordinates are already normalised."""
-
-    return x, 1 - y
-
-
-def load_in_coordinates(image) -> set[tuple[float, float]]:
-    """ This method loads the coordinates of the dots which are detected in the haar cascade.
-    We extract the centroid of this input and also normalize the coordinates to the [0, 1] interval.
-    Furthermore, we use a new origin, located at the bottom left of the image."""
-
-    height_image = image.shape[0]
-    width_image = image.shape[1]
-
-    list_coordinates = set()
-
-    # list_of_coordinates returns a list containing 4-tuples of the form (x, y, width, height).
-    # This rectangle surrounds the dot of the salamander. The origin of the used coordinate system is at the top left
-    # of the image. (x, y) denotes the upper left coordinate of the rectangle. Width and height respectively denote
-    # the length of the side of the rectangle, starting from the (x, y) coordinate, in x and y direction.
-    list_haar_cascade = dot_detect_haar(image)
-    if len(list_haar_cascade) == 0:
-        return set()
-
-    for (x, y, w, h) in list_haar_cascade:
-        # First, we try to detect the center of the rectangle in the given coordinate system.
-        x_centroid, y_centroid = calculate_centroid_of_rectangle(x, y, w, h)
-
-        # Second, we normalize the coordinates and use a new coordinate system (with the origin at the bottom left
-        # of the image).
-        x_centroid, y_centroid = normalisation_of_coordinates(x_centroid, y_centroid, width_image, height_image)
-        x_centroid, y_centroid = transform_origin(x_centroid, y_centroid)
-
-        list_coordinates.add((x_centroid, y_centroid))
-
-    return list_coordinates
 
 
 """ STEP 1: Selecting the points to be matched."""
@@ -798,17 +690,12 @@ def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
     return top_list + bottom_list
 
 
-def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
-                    list_of_scores: list[tuple[int, float, float, str, str]], weight_S1=0.3, weight_S2=0.7):
+def display_results(image: np.ndarray, database: dict[str, np.ndarray],
+                    list_of_scores: list[tuple[int, float, float, str, str]]):
     """ This method will display the three best matches to the user.
 
     INPUT: list_of_scores is of the form [ (S1, S1_rel, S2, keyword, name), ... ]. """
 
-    # Convert the database in a dictionary for easy acces.
-    database = {name: image for image, name in database}
-
-    # Sort the list_of_scored based on highest combined score.
-    list_of_scores = sort_list_of_scores(list_of_scores, weight_S1, weight_S2)
 
     # Select the top three matches.
     top_matches = list_of_scores[:3]
@@ -841,5 +728,3 @@ def display_results(image: np.ndarray, database: list[tuple[np.ndarray, str]],
 
     plt.tight_layout()
     plt.show()
-
-    return list_of_scores

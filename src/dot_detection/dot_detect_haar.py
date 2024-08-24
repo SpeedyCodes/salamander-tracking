@@ -1,6 +1,6 @@
 import cv2 as cv
 from src.utils import wrapped_imread
-from src.background_removal import isolate_salamander
+from src.preprocessing import isolate_salamander
 import threading
 
 

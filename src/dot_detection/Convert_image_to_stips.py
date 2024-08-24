@@ -30,7 +30,7 @@ quality and can easily detect false positive dots.
 
 import cv2 as cv
 from scripts.Generating_extra_data import filenames_from_folder, resize_with_aspect_ratio
-from src.background_removal import isolate_salamander
+from src.preprocessing import isolate_salamander
 from matplotlib import pyplot as plt
 import numpy as np
 from src.utils import wrapped_imread

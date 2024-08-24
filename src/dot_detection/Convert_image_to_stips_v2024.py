@@ -5,7 +5,7 @@ This document will try to detect the dots on an image of a salamander.
 Attention: this code is specifically made for the salamanders of year 2024!
 """
 
-from src.background_removal import isolate_salamander
+from src.preprocessing import isolate_salamander
 import cv2 as cv
 from .Convert_image_to_stips import filenames_from_folder, resize_with_aspect_ratio
 from src.utils import wrapped_imread
