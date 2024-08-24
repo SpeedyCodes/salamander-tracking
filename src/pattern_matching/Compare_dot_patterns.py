@@ -59,6 +59,7 @@ def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
     start_time = time()
 
     def matching_procedure(list_coordinates_image_from_database, name_image_from_database):
+        list_coordinates_image_from_database = select_points_to_be_matched(list_coordinates_image_from_database, 3 * tol)
         matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates, list_coordinates_image_from_database,
                                                               tol=tol,
                                                               plot_r_values=plot_r_values)

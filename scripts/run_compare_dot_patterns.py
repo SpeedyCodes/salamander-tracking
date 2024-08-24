@@ -1,11 +1,9 @@
 from typing import List, Tuple, Set
 
-from scripts.Generating_extra_data import filenames_from_folder
-from src.dot_detection import dot_detect_haar
-from src.preprocessing import normalise_coordinates, crop_image
 from src.utils import wrapped_imread
+from scripts.Generating_extra_data import filenames_from_folder
 from src.pattern_matching import compare_dot_patterns, display_results
-from src.pattern_matching.Compare_dot_patterns import select_points_to_be_matched
+from src.facade import image_to_canonical_representation
 from time import time
 import threading
 
@@ -20,11 +18,7 @@ def get_db(database, thread_count, tol) -> List[Tuple[Set[Tuple[float, float]], 
 
     database_of_coordinates = []
     def image_to_coords(image_from_database, name_image_from_database):
-        image_from_database = crop_image(image_from_database)
-        list_haar_cascade = dot_detect_haar(image_from_database)
-        list_coordinates_image_from_database = normalise_coordinates(list_haar_cascade, image_from_database.shape)
-        list_coordinates_image_from_database = select_points_to_be_matched(list_coordinates_image_from_database,
-                                                                           tol=3 * tol)
+        list_coordinates_image_from_database = image_to_canonical_representation(image_from_database)
         database_of_coordinates.append((list_coordinates_image_from_database, name_image_from_database))
 
     if thread_count == 1:  # no threading
@@ -59,10 +53,7 @@ if __name__ == '__main__':
 
     start_time = time()
 
-    # First, crop the image to the essential part.
-    image_crop = crop_image(unknown_image)
-    list_haar_cascade = dot_detect_haar(image_crop)
-    list_coordinates = normalise_coordinates(list_haar_cascade, image_crop.shape)
+    list_coordinates = image_to_canonical_representation(unknown_image)
     list_of_scores = compare_dot_patterns(list_coordinates, get_db(database, 8, 0.01))
 
     # Convert the database in a dictionary for easy acces.
