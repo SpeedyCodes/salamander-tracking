@@ -3,6 +3,7 @@ from typing import Dict, Tuple
 
 import numpy as np
 from scipy.interpolate import interp1d, CubicSpline
+from scipy import integrate
 import cv2
 
 class CoordinateTransformer:
@@ -16,21 +17,27 @@ class CoordinateTransformer:
         """
 
         self.datapoints = datapoints
-        self.x_given = np.array([])
-        self.y_given = np.array([])
         # not all datapoints are part of the spine
         self.used_points = ["spine_highest", "spine_high", "spine_middle", "spine_low", "spine_lowest"]
 
         self.x_remapped = np.array([0] * len(self.used_points))
         self.y_remapped = np.array([0] * len(self.used_points))
 
-        for body_part_name, (x, y, confidence) in datapoints.items():
-            if body_part_name in self.used_points:
-                self.x_given = np.append(self.x_given, x)
-                self.y_given = np.append(self.y_given, y)
+        x_given = []
+        y_given = []
+        for body_part_name in self.used_points:
+            x, y, confidence = datapoints[body_part_name]
+            x_given.append(x)
+            y_given.append(y)
 
-        self.xPoly = self._get_interpolation_for_axis(self.x_given)
-        self.yPoly = self._get_interpolation_for_axis(self.y_given)
+        self.x_given = np.array(x_given)
+        self.y_given = np.array(y_given)
+
+        self.x_poly = self._get_interpolation_for_axis(self.x_given)
+        self.y_poly = self._get_interpolation_for_axis(self.y_given)
+        self.x_poly_derivative = self.x_poly.derivative()
+        self.y_poly_derivative = self.y_poly.derivative()
+        self.arc_length_integrand = lambda t: np.sqrt(self.x_poly_derivative(t) ** 2 + self.y_poly_derivative(t) ** 2)
 
         self.middle_point_t = self.used_points.index("spine_middle")
 
@@ -48,8 +55,8 @@ class CoordinateTransformer:
         t_max = len(self.x_given) - 1
 
         lspace = np.linspace(t_min, t_max, 100)
-        draw_x = self.xPoly(lspace)
-        draw_y = self.yPoly(lspace)
+        draw_x = self.x_poly(lspace)
+        draw_y = self.y_poly(lspace)
 
         draw_points = np.asarray([draw_x, draw_y]).T.astype(np.int32)
         cv2.polylines(image, [draw_points], False, (0, 0, 0))
@@ -63,7 +70,7 @@ class CoordinateTransformer:
             cv2.circle(image, (int(x), int(y)), 5, (255, 0, 0), -1)
 
         cv2.line(image, (int(self.x_remapped[0]), int(self.y_remapped[0])),
-                 (int(self.x_remapped[4]), int(self.y_remapped[4])), (255, 0, 0))
+                 (int(self.x_remapped[-1]), int(self.y_remapped[-1])), (255, 0, 0))
 
         cv2.imshow("image", image)
         cv2.waitKey(0)
@@ -77,22 +84,20 @@ class CoordinateTransformer:
         self.x_remapped[self.middle_point_t] = self.x_given[self.middle_point_t]
         self.y_remapped[self.middle_point_t] = self.y_given[self.middle_point_t]
 
+        # work outwards from the middle point
         for delta in [-1, 1]:
-            # first do the inner points
-            inner_point_t = self.middle_point_t + delta
-            self.x_remapped[inner_point_t] = self.x_given[self.middle_point_t]
-            # TODO this should probably be the arc length over the spline
-            distance_between_points = np.sqrt((self.x_given[self.middle_point_t] - self.x_given[inner_point_t]) ** 2 + (
-                    self.y_given[self.middle_point_t] - self.y_given[inner_point_t]) ** 2)
-            self.y_remapped[inner_point_t] = self.y_given[self.middle_point_t] + delta * distance_between_points
+            base_point_t = self.middle_point_t
+            new_point_t = self.middle_point_t + delta
+            while 0 <= new_point_t < len(self.x_given):
+                self.x_remapped[new_point_t] = self.x_remapped[base_point_t]
+                distance_between_points = abs(self._arc_length(base_point_t, new_point_t))
+                self.y_remapped[new_point_t] = self.y_given[base_point_t] + delta * distance_between_points
 
-            # continue with the outer points
-            outer_point_t = self.middle_point_t + 2 * delta
-            self.x_remapped[outer_point_t] = self.x_given[self.middle_point_t]
-            # TODO this should probably be the arc length over the spline
-            distance_between_points = np.sqrt((self.x_given[inner_point_t] - self.x_given[outer_point_t]) ** 2 + (
-                    self.y_given[inner_point_t] - self.y_given[outer_point_t]) ** 2)
-            self.y_remapped[outer_point_t] = self.y_given[inner_point_t] + delta * distance_between_points
+                base_point_t = new_point_t
+                new_point_t += delta
+
+    def _arc_length(self, t_start: int, t_end: int):
+        return integrate.quad(self.arc_length_integrand, t_start, t_end)[0]
 
     def transform(self, x, y):
         """
@@ -104,8 +109,8 @@ class CoordinateTransformer:
 
         #  find the closest point in the interpolation
         t = np.linspace(0, len(self.x_given) - 1, 1000)
-        x_t = self.xPoly(t)
-        y_t = self.yPoly(t)
+        x_t = self.x_poly(t)
+        y_t = self.y_poly(t)
         distances = np.sqrt((x_t - x) ** 2 + (y_t - y) ** 2)
         closest_point_index = np.argmin(distances)
         closest_point = (int(x_t[closest_point_index]), int(y_t[closest_point_index]))
@@ -115,8 +120,8 @@ class CoordinateTransformer:
         closest_point_t = t[closest_point_index]
         lower_t_bound = floor(closest_point_t)
         upper_t_bound = ceil(closest_point_t)
-        lower_bound_coords = (self.xPoly(lower_t_bound), self.yPoly(lower_t_bound))
-        upper_bound_coords = (self.xPoly(upper_t_bound), self.yPoly(upper_t_bound))
+        lower_bound_coords = (self.x_poly(lower_t_bound), self.y_poly(lower_t_bound))
+        upper_bound_coords = (self.x_poly(upper_t_bound), self.y_poly(upper_t_bound))
         lower_to_upper = upper_bound_coords[0] - lower_bound_coords[0], upper_bound_coords[1] - lower_bound_coords[1]
         lower_to_closest = x - lower_bound_coords[0], y - lower_bound_coords[1]
 
