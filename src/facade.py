@@ -1,5 +1,5 @@
 import numpy as np
-
+from src.pose_estimation import estimate_pose_from_image
 from src.dot_detection import dot_detect_haar
 from src.preprocessing import crop_image, normalise_coordinates
 from src.pattern_matching import compare_dot_patterns
