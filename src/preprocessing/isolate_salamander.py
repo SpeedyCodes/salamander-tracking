@@ -11,12 +11,13 @@ import numpy as np
 import largestinteriorrectangle as lir
 
 
-def isolate_salamander(image: np.array, is_old_and_new: bool = False) -> np.array:
+def isolate_salamander(image: np.array, is_old_and_new: bool = False, crop_to_belly: bool = True) -> np.array:
     """ This function will include a bunch of other functions, it will return a black image with only the salamander.
 
     INPUT: numpy array image, this must! be in BGR format, this type of image can be obtained by wrapped_imread.
     INPUT: if is_old_and_new is True, it will return the old isolate salamander and the new cropped version of
     the belly. Otherwise, if false, then it will just return the new cropped version of the belly.
+    INPUT: if crop_to_belly is True, isolate salamander will also keep removing everything until only the belly remains.
     OUTPUT: if is_old_and_new is True, then it will return two images:
     First the new cropped version of the belly, then the old isolate salamander.
     Otherwise, it will only return the new cropped version of the belly.
@@ -42,11 +43,15 @@ def isolate_salamander(image: np.array, is_old_and_new: bool = False) -> np.arra
     # Isolate the whole salamander from the background.
     image_isolated_without_noise = draw_best_contour(best_contour, image_isolated_salamander_with_noise)
 
-    # Try to find the belly of the salamander.
-    image_belly = find_the_belly(best_contour, image_isolated_without_noise)
-    if is_old_and_new:
-        return image_isolated_without_noise, image_belly
-    return image_belly
+    if crop_to_belly:
+        # Try to find the belly of the salamander.
+        image_belly = find_the_belly(best_contour, image_isolated_without_noise)
+
+        if is_old_and_new:
+            return image_isolated_without_noise, image_belly
+        return image_belly
+
+    return image_isolated_without_noise
 
 
 def color_segmentation(image, ksize, lower_bound, upper_bound):
@@ -518,11 +523,16 @@ def resize(image, width=None, height=750, inter=cv.INTER_AREA):
     return cv.resize(image, dim, interpolation=inter)
 
 
-def crop_image(image):
-    """ This method will literally crop the image. So we remove the non-interesting, white background. """
+def crop_image(image, crop_to_belly: bool = True):  # Only gets used in facade.py
+    """ This method will literally crop the image. So we remove the non-interesting, white background.
+    This removes everything except the belly of the salamander.
+
+    INPUT: image
+    INPUT: crop_to_belly = True means that the image gets cropped until only the belly remains. If it is False, then
+    the entire salamander (with paws and head and so on) remains."""
 
     try:
-        image = isolate_salamander(image)
+        image = isolate_salamander(image, crop_to_belly=crop_to_belly)
     except:
         return image
     else:
