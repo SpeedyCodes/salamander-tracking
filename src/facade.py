@@ -22,7 +22,7 @@ def main_body_parts_to_coordinates(image: np.ndarray) -> Tuple[np.ndarray, Dict[
     h, w = image.shape[:2]
 
     # Case 1, the image is too big for the pose estimation.
-    if h > 2500 or w > 2500:
+    if h > 2500 or w > 2500:  # TODO : This is temporary until we can have a check if it works or not.
 
         # Obtains the image without background, but still full salamander.
         image = crop_image(image, crop_to_belly=False)

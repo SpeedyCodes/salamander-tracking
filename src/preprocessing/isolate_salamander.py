@@ -529,7 +529,8 @@ def crop_image(image, crop_to_belly: bool = True):  # Only gets used in facade.p
 
     INPUT: image
     INPUT: crop_to_belly = True means that the image gets cropped until only the belly remains. If it is False, then
-    the entire salamander (with paws and head and so on) remains."""
+    the entire salamander (with paws and head and so on) remains (this case usually means that the pose estimation did
+    not work well)."""
 
     try:
         image = isolate_salamander(image, crop_to_belly=crop_to_belly)
