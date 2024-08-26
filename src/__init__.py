@@ -1,1 +1,0 @@
-from .facade import image_to_canonical_representation, match_canonical_representation_to_database

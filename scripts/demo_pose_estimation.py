@@ -1,11 +1,12 @@
 import cv2
 from os.path import exists
 from src.pose_estimation import estimate_pose_from_image
+from src.utils import wrapped_imread
 
 
-#image = cv2.imread("pose_estimation/testdata/2019-Sal24.jpg")
-image = cv2.imread("src/pose_estimation/testdata/2022-Sal59.jpg")
-results = estimate_pose_from_image(image)
+#image = wrapped_imread("pose_estimation/testdata/2019-Sal24.jpg")
+image = wrapped_imread("src/pose_estimation/testdata/2022-Sal59.jpg")
+results, success = estimate_pose_from_image(image)
 print(results)
 for body_part_name, (x, y, confidence) in results.items():
     print(f"{body_part_name}: ({x}, {y}), confidence: {confidence}")
@@ -17,9 +18,9 @@ for body_part_name, (x, y, confidence) in results.items():
 cv2.imshow("image", image)
 
 suffix = 0
-filename = f"pose_estimation/testdata/result{suffix}.jpg"
+filename = f"src/pose_estimation/testdata/result{suffix}.jpg"
 while exists(filename):
     suffix += 1
-    filename = f"pose_estimation/testdata/result{suffix}.jpg"
+    filename = f"src/pose_estimation/testdata/result{suffix}.jpg"
 cv2.imwrite(filename, image)
 cv2.waitKey(0)

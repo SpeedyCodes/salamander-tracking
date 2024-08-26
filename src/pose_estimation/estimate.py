@@ -1,10 +1,9 @@
 from typing import Dict, Tuple
-import deeplabcut as dlc
 import tempfile
 import numpy as np
 import cv2
 import os
-
+import subprocess
 # This file abstracts away the process of analyzing an image using DeepLabCut.
 # Lots of filesystem-related mess
 # because DeepLabCut can neither read from an in-memory image nor return the results from the function itself
@@ -22,19 +21,21 @@ h5_file_path = f"{output_file}.h5"
 pickle_file_path = f"{output_file}_meta.pickle"
 
 
-def estimate_pose_from_image(image: np.ndarray) -> Dict[str, Tuple[int, int, float]]:
+def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, int, float]], bool]:
     """
     Estimate the pose of a salamander in an image using DeepLabCut.
     :param image: The image to analyze
     :return: A dictionary mapping body part names to their estimated positions and confidences:
-     {body_part_name: (x, y, confidence)}
+     {body_part_name: (x, y, confidence)} and a boolean indicating whether the analysis was successful
     """
-
 
     # save the image to the working directory so DLC can read it
     cv2.imwrite(f"{working_dir}/image.jpg", image)
-    # analyze the image using DLC
-    dlc.analyze_time_lapse_frames(config_file_path, working_dir, save_as_csv=True, frametype='jpg')
+    # analyze the image using DLC, in separate subprocess to survive crashes
+    p = subprocess.Popen(["venv/Scripts/python.exe",  "src/pose_estimation/deeplabcut_runner.py"],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.wait() != 0: # error code
+        return {}, False
 
     # read the CSV file that DLC generated
     lines = []
@@ -54,4 +55,4 @@ def estimate_pose_from_image(image: np.ndarray) -> Dict[str, Tuple[int, int, flo
         if os.path.exists(path):
             os.remove(path)
 
-    return body_parts
+    return body_parts, True
