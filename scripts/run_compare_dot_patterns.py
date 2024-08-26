@@ -4,6 +4,7 @@ from src.utils import wrapped_imread
 from scripts.Generating_extra_data import filenames_from_folder
 from src.pattern_matching import compare_dot_patterns, display_results
 from src.facade import image_to_canonical_representation
+from server.database_interface import get_individuals_coords
 from time import time
 import threading
 
@@ -42,19 +43,22 @@ def get_db(database, thread_count, tol) -> List[Tuple[Set[Tuple[float, float]], 
 
 
 if __name__ == '__main__':
-    for year in year_list:
-        for sal in filenames_from_folder(
-                f'{location}{year}'):
-            img = wrapped_imread(f'{location}{year}{sal}')
-
-            database.append((img, sal))
+    # for year in year_list:
+    #     for sal in filenames_from_folder(
+    #             f'{location}{year}'):
+    #         img = wrapped_imread(f'{location}{year}{sal}')
+    #
+    #         database.append((img, sal))
 
     unknown_image = wrapped_imread(f'{location}2018/2018-Sal04.jpg')
 
     start_time = time()
 
+    #other_database = get_db(database, 8, 0.1)
+    coords_database = get_individuals_coords()
+
     list_coordinates = image_to_canonical_representation(unknown_image)
-    list_of_scores = compare_dot_patterns(list_coordinates, get_db(database, 8, 0.01))
+    list_of_scores = compare_dot_patterns(list_coordinates, coords_database)
 
     # Convert the database in a dictionary for easy acces.
     database = {name: image for image, name in database}

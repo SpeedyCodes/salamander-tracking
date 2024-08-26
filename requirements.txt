@@ -10,3 +10,4 @@ keras==2.12.0
 typing-extensions>=4.6
 torch==2.3.0
 scipy
+pymongo[srv]==3.11

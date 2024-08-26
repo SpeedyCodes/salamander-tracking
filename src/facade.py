@@ -28,11 +28,11 @@ def main_body_parts_to_coordinates(image: np.ndarray) -> Tuple[np.ndarray, Dict[
         image = crop_image(image, crop_to_belly=False)
 
         # Now try the pose estimation again on the smaller image.
-        main_body_parts = estimate_pose_from_image(image)
+        main_body_parts, success = estimate_pose_from_image(image)
 
     # Case 2, the image is small enough for the pose estimation.
     else:
-        main_body_parts = estimate_pose_from_image(image)
+        main_body_parts, success = estimate_pose_from_image(image)
 
     return image, main_body_parts
 

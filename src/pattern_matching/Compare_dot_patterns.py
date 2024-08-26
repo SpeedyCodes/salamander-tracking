@@ -32,13 +32,13 @@ from typing import List, Tuple, Set
 
 
 def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
-                         database_of_coordinates: List[Tuple[Set[Tuple[float, float]], str]],
+                         database_of_coordinates: List[Tuple[str, Set[Tuple[float, float]]]],
                          tol: float = 0.01, is_second_run: bool = True, plot_r_values: bool = False,
                          thread_count: int = 1):
     """ This function will include a bunch of other functions ...
 
     INPUT: unknown_image_coordinates contains the coordinates of the image we want to compare with our database.
-    INPUT: database_of_coordinates is a list of tuples(coords, name) that represents all the items of our database.
+    INPUT: database_of_coordinates is a list of tuples(name, coords) that represents all the items of our database.
     INPUT: the tolerance tol is a parameter that the user is free to set. If detected dots have distance less than
     a scaler multiplied by tol, then we consider these dots as one. (We remove one of the two dots, this ensures that
     the numerical computations are stable).
@@ -58,7 +58,7 @@ def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
 
     start_time = time()
 
-    def matching_procedure(list_coordinates_image_from_database, name_image_from_database):
+    def matching_procedure(name_image_from_database, list_coordinates_image_from_database):
         list_coordinates_image_from_database = select_points_to_be_matched(list_coordinates_image_from_database, 3 * tol)
         matched_points, V, f_t, V_max = run_through_algorithm(list_coordinates, list_coordinates_image_from_database,
                                                               tol=tol,
@@ -87,8 +87,8 @@ def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
 
     # Start matching procedure for every image in the database.
     if thread_count == 1:  # no threading
-        for list_coordinates_image_database, name_image_database in database_of_coordinates:
-            matching_procedure(list_coordinates_image_database, name_image_database)
+        for name_image_database, list_coordinates_image_database in database_of_coordinates:
+            matching_procedure(name_image_database, list_coordinates_image_database)
             loading_bar.update(1)
     else:  # threaded execution
         def thread_function(start, end):
