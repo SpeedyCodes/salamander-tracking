@@ -50,7 +50,7 @@ def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
             pose_estimation_evaluation = 0
 
     if pose_estimation_evaluation == 2:
-
+        # Crop by using pose_estimation.
         if is_background_removed:
 
             try:
@@ -66,7 +66,7 @@ def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
                 pose_estimation_evaluation = 0
 
     if pose_estimation_evaluation == 0:
-
+        # Use the old methods to crop the image.
         if is_background_removed:
             try:
                 cropped_image = crop_image(no_background, coordinates_pose, is_background_removed,
