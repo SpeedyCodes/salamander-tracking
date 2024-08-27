@@ -1,88 +1,33 @@
 """ Rune De Coninck
 
-Given a picture, this document will try to isolate (the belly of) the salamander from the background.
-Hence, it will return a new image, without minimal background.
-There are two main ways of dealing with this, first the old way and second the new way.
-By using two approaches, we can have a buffer for when a specific method does not work on a given image.
-
-1. By using color segmentation and morphological operations to detect the salamander.
+Given a picture, this document will try to isolate the salamander from the background.
+Hence, it will return a new image, without minimal background and as much of the salamander.
+We will commence by using color segmentation and morphological operations to detect the salamander.
 After that, we will try to remove some parts of the background.
-
-2. Using pose estimation to detect points on the torso of the salamander. Then we interpolate those points and
-remove everything outside the perimeter.
 """
 
 import cv2 as cv
 import numpy as np
 import largestinteriorrectangle as lir
-from typing import Dict, Tuple
-import math
-from scipy.interpolate import splprep, splev
 
 
-def assert_bgr_format(image):
-    assert isinstance(image, np.ndarray), "Image must be a numpy array."
-    assert image.ndim == 3, "Image must be in BGR format."
-    assert image.shape[2] == 3, "Image must be in BGR format."
-
-
-def assert_pose_estimation_evaluation(val):
-    assert 0 <= val <= 2, "Pose estimation evaluation must be between 0 and 2."
-
-
-def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, float]] | None = None,
-                       is_background_removed: bool = False, pose_estimation_evaluation: int = 0) -> np.array:
-    """ This function will include a bunch of other functions.
+def isolate_salamander(image: np.array, is_old_and_new: bool = False, crop_to_belly: bool = True) -> np.array:
+    """ This function will include a bunch of other functions, it will return a black image with only the salamander.
 
     INPUT: numpy array image, this must! be in BGR format, this type of image can be obtained by wrapped_imread.
-    Important is that this image can already have removed background!
-    INPUT: coordinates_pose are the coordinates of the important parts of the body of the salamander, detected
-    by the pose estimation.
-    INPUT: is_background_removed denotes if the background of the image is already removed or not.
-    INPUT: pose_estimation_evaluation, this will be 0, 1 or 2 depending on how good the pose estimation worked.
-        Value = 0 means the pose estimation failed twice, or we do not want to use it. So we use old methods.
-        Value = 1 means the pose estimation failed once, and we will now remove the background and try again.
-        Value = 2 means the pose estimation succeeded from the first time, and we will use it to find the belly.
-
-    OUTPUT: A new image that has a black background. The only thing remaining is (the belly of) the salamander. """
-
-    value = pose_estimation_evaluation
-
-    assert_bgr_format(image)
-    assert_pose_estimation_evaluation(value)
-
-    if value == 0:  # We use old methods to find the belly.
-
-        if is_background_removed:
-            image_belly = find_belly_with_old_methods(image, is_background_removed=True)
-
-        else:
-            image_belly = find_belly_with_old_methods(image, is_background_removed=False)
-
-        return image_belly
-
-    elif value == 1:  # We need to remove the background, but leave salamander intact.
-        image_no_background, _ = remove_background_old_methods(image)
-
-        return image_no_background
-
-    elif value == 2:  # We need to isolate the belly of the salamander using pose estimation.
-        tck, points = find_torso(coordinates_pose, image)
-
-        image_belly_with_pose_estimation = remove_everything_outside_curve(image, tck)
-
-        return image_belly_with_pose_estimation
-
-
-def remove_background_old_methods(image: np.array) -> np.array:
-    """ This function will remove the background on the image. It will return an image with only the salamander
-    remaining in a black background. """
+    INPUT: if is_old_and_new is True, it will return the old isolate salamander and the new cropped version of
+    the belly. Otherwise, if false, then it will just return the new cropped version of the belly.
+    INPUT: if crop_to_belly is True, isolate salamander will also keep removing everything until only the belly remains.
+    OUTPUT: if is_old_and_new is True, then it will return two images:
+    First the new cropped version of the belly, then the old isolate salamander.
+    Otherwise, it will only return the new cropped version of the belly.
+    In all cases, the output images are numpy array images."""
 
     # First, detect the salamander (and mask) with color segmentation, thus there will be some noise left.
     image_isolated_salamander_with_noise, mask = color_segmentation(image, ksize=51, lower_bound=[5, 50, 50],
                                                                     upper_bound=[35, 255, 255])
 
-    # Try to filter out the noise based on the fact that the contour of the salamander is a big central object.
+    # Second, try to filter out the noise based on the fact that the contour of the salamander is a big central object.
     image_contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     height, width = image.shape[:2]
@@ -98,20 +43,15 @@ def remove_background_old_methods(image: np.array) -> np.array:
     # Isolate the whole salamander from the background.
     image_isolated_without_noise = draw_best_contour(best_contour, image_isolated_salamander_with_noise)
 
-    return image_isolated_without_noise, best_contour
+    if crop_to_belly:
+        # Try to find the belly of the salamander.
+        image_belly = find_the_belly(best_contour, image_isolated_without_noise)
 
+        if is_old_and_new:
+            return image_isolated_without_noise, image_belly
+        return image_belly
 
-def find_belly_with_old_methods(image: np.array, is_background_removed: bool) -> np.array:
-    """ This function find the belly with old methods."""
-
-    best_contour = None
-    if not is_background_removed:  # Then first remove it...
-        image, best_contour = remove_background_old_methods(image)
-
-    # Try to find the belly of the salamander.
-    image_belly = find_the_belly(best_contour, image)
-
-    return image_belly
+    return image_isolated_without_noise
 
 
 def color_segmentation(image, ksize, lower_bound, upper_bound):
@@ -479,11 +419,6 @@ def find_the_belly(best_contour, image):
     angle = None
     counter = 0
 
-    if best_contour is None:
-        image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-        best_contour, _ = cv.findContours(image_gray, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
-        best_contour = max(best_contour, key=cv.contourArea)
-
     while counter <= 1:
         # First loop: detect the orientation of the salamander.
         # Second loop: cut of the head, paws and tail of the salamander.
@@ -574,336 +509,6 @@ def draw_best_contour(best_contour, image):
     return image
 
 
-def select_useful_coordinates_from_pose_estimation(pose_estimation_dict):
-    """ This method will select the shoulder, pelvis and spine coordinates, if the confidence is high enough. """
-
-    useful_coordinates = dict()
-    useful_names = ['spine_lowest', 'spine_low', 'spine_middle', 'spine_high', 'spine_highest', 'left_shoulder',
-                    'right_shoulder', 'left_pelvis', 'right_pelvis']
-
-    for name in pose_estimation_dict:
-        if name in useful_names and pose_estimation_dict[name][2] >= 0.70:
-            useful_coordinates[name] = pose_estimation_dict[name]
-
-    assert_coordinates_from_pose_estimation(useful_coordinates)
-
-    return useful_coordinates
-
-
-def assert_coordinates_from_pose_estimation(coordinates):
-    if ('left_pelvis' not in coordinates) and ('right_pelvis' not in coordinates):
-        assert False, 'No left pelvis and right pelvis coordinates were detected.'
-    if ('left_shoulder' not in coordinates) and ('right_shoulder' not in coordinates):
-        assert False, 'No left shoulder and right shoulder coordinates were detected.'
-    if ('spine_highest' not in coordinates) or ('spine_lowest' not in coordinates):
-        assert False, 'No spine highest and lowest coordinates were detected.'
-
-
-def find_torso(pose_estimation_dict, image):
-    """ This method tries to find the shape of the torso of the salamander via interpolation. This enables us to
-    also detect torsos that are curved."""
-
-    pose_estimation_dict = select_useful_coordinates_from_pose_estimation(pose_estimation_dict)
-
-    coords_with_distance = compute_distances_for_torso(pose_estimation_dict)
-    coords_with_angle = compute_angle_for_torso(coords_with_distance, pose_estimation_dict, image)
-
-    points = find_coordinates_on_torso(coords_with_distance, coords_with_angle, pose_estimation_dict)
-
-    # Interpolation:
-    x = points[:, 0]
-    y = points[:, 1]
-
-    tck, u = splprep([x, y], s=0, per=True)
-
-    return tck, points
-
-
-def calculate_rico_for_torso(point1: Tuple[float | int, float | int], point2: Tuple[float | int, float | int]):
-    """ This method calculates the rico, given two points. The rico is based on the horizontal axis."""
-
-    if point1[0] == point2[0]:
-        return 5000
-
-    return (point2[1] - point1[1]) / (point2[0] - point1[0])
-
-
-def calculate_angle_for_torso(rico1: float, rico2: float):
-    """ This method will calculate the angle in degrees between two rico's."""
-
-    angle = 360 - math.degrees(math.atan((rico1 - rico2) / (1 + rico1 * rico2)))
-
-    while angle > 180:
-        angle -= 360
-    while angle < -180:
-        angle += 360
-
-    return angle
-
-
-def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float | int]]:
-    """ This method will calculate the distances between the detected point by the pose estimation and the points
-    at the torso of the salamander (which are not detected by the pose estimation). """
-
-    distances = []
-
-    if 'left_shoulder' not in pose_estimation_dict:
-        shoulder_distance = math.dist(pose_estimation_dict['right_shoulder'][:2],
-                                      pose_estimation_dict['spine_highest'][:2])
-
-    elif 'right_shoulder' not in pose_estimation_dict:
-        shoulder_distance = math.dist(pose_estimation_dict['left_shoulder'][:2],
-                                      pose_estimation_dict['spine_highest'][:2])
-
-    else:
-        left_shoulder_distance = math.dist(pose_estimation_dict['left_shoulder'][:2],
-                                           pose_estimation_dict['spine_highest'][:2])
-        right_shoulder_distance = math.dist(pose_estimation_dict['right_shoulder'][:2],
-                                            pose_estimation_dict['spine_highest'][:2])
-        shoulder_distance = np.average([left_shoulder_distance, right_shoulder_distance])
-
-        # Enlarge the distance a bit such that we make sure the whole belly is captured.
-        shoulder_distance = shoulder_distance * 1.2
-
-    if 'left_pelvis' not in pose_estimation_dict:
-        pelvis_distance = math.dist(pose_estimation_dict['right_pelvis'][:2],
-                                    pose_estimation_dict['spine_lowest'][:2])
-    elif 'right_pelvis' not in pose_estimation_dict:
-        pelvis_distance = math.dist(pose_estimation_dict['left_pelvis'][:2],
-                                    pose_estimation_dict['spine_lowest'][:2])
-    else:
-        left_pelvis_distance = math.dist(pose_estimation_dict['left_pelvis'][:2],
-                                         pose_estimation_dict['spine_lowest'][:2])
-        right_pelvis_distance = math.dist(pose_estimation_dict['right_pelvis'][:2],
-                                          pose_estimation_dict['spine_lowest'][:2])
-        pelvis_distance = np.average([left_pelvis_distance, right_pelvis_distance])
-
-        # Enlarge the distance a bit such that we make sure the whole belly is captured.
-        pelvis_distance = pelvis_distance * 1.2
-
-    if pelvis_distance >= shoulder_distance:
-        delta_pelvis_shoulder = pelvis_distance - shoulder_distance
-        smallest = shoulder_distance
-
-    else:
-        delta_pelvis_shoulder = shoulder_distance - pelvis_distance
-        smallest = pelvis_distance
-
-    temp_list = []
-    for point in pose_estimation_dict:
-        if point == 'spine_high' or point == 'spine_middle' or point == 'spine_low':
-            temp_list.append(point)
-
-    assert len(temp_list) > 0, 'No points on the spine were detected.'
-
-    extra_distance = delta_pelvis_shoulder / (len(temp_list) + 2)
-    factor = 1
-
-    if smallest == pelvis_distance:
-
-        distances.append(('pelvis', pelvis_distance))
-        if 'spine_low' in temp_list:
-            distances.append(('spine_low', pelvis_distance + factor * extra_distance))
-            factor += 1
-        if 'spine_middle' in temp_list:
-            distances.append(('spine_middle', pelvis_distance + factor * extra_distance))
-            factor += 1
-        if 'spine_high' in temp_list:
-            distances.append(('spine_high', pelvis_distance + factor * extra_distance))
-            factor += 1
-        distances.append(('shoulder', shoulder_distance))
-
-    else:
-
-        distances.append(('pelvis', pelvis_distance))
-        if 'spine_low' in temp_list:
-            distances.append(('spine_low', pelvis_distance - factor * extra_distance))
-            factor += 1
-        if 'spine_middle' in temp_list:
-            distances.append(('spine_middle', pelvis_distance - factor * extra_distance))
-            factor += 1
-        if 'spine_high' in temp_list:
-            distances.append(('spine_high', pelvis_distance - factor * extra_distance))
-            factor += 1
-        distances.append(('shoulder', shoulder_distance))
-
-    return distances
-
-
-def compute_angle_for_torso(coords_with_distance, pose_estimation_dict) -> list[Tuple[str, float | int]]:
-    """ This method will calculate the angle needed for a perpendicular line, starting at the detected point
-    and ending at the torso of the salamander."""
-
-    rico_list = []
-
-    for first, second in zip(coords_with_distance, coords_with_distance[1:]):
-        first = first[0]
-        second = second[0]
-
-        if first == 'shoulder':
-            break
-
-        elif first == 'pelvis':
-            first_coordinate = pose_estimation_dict['spine_lowest'][:2]
-
-        else:
-            first_coordinate = pose_estimation_dict[first][:2]
-
-        if second == 'shoulder':
-            second_coordinate = pose_estimation_dict['spine_highest'][:2]
-
-        else:
-            second_coordinate = pose_estimation_dict[second][:2]
-
-        rico = calculate_rico_for_torso(first_coordinate, second_coordinate)
-
-        rico_list.append((first, second, rico))
-
-    coords_with_angle = []
-    need_to_solve_issue_pelvis = False
-    need_to_solve_issue_shoulder = False
-
-    if ('left_pelvis' in pose_estimation_dict) and ('right_pelvis' in pose_estimation_dict):
-        rico_pelvis = calculate_rico_for_torso(pose_estimation_dict['left_pelvis'][:2],
-                                               pose_estimation_dict['right_pelvis'][:2])
-        angle_pelvis = calculate_angle_for_torso(0, rico_pelvis)
-
-        coords_with_angle.append(('pelvis', angle_pelvis))
-        current_angle = angle_pelvis
-
-    else:
-        need_to_solve_issue_pelvis = True
-        angle_pelvis = None
-        current_angle = None
-
-    if ('left_shoulder' in pose_estimation_dict) and ('right_shoulder' in pose_estimation_dict):
-        rico_shoulder = calculate_rico_for_torso(pose_estimation_dict['left_shoulder'][:2],
-                                                 pose_estimation_dict['right_shoulder'][:2])
-        angle_shoulder = calculate_angle_for_torso(0, rico_shoulder)
-
-    else:
-        need_to_solve_issue_shoulder = True
-        angle_shoulder = None
-
-    counter = 1
-
-    for first, second in zip(rico_list, rico_list[1:]):
-
-        angle = calculate_angle_for_torso(first[2], second[2])
-
-        if counter == 1 and need_to_solve_issue_pelvis:
-            # We cannot compute the angle on the pelvis, so we try something artificial by using the next one and
-            # turning it 90 degrees.
-
-            if rico_list[0][2] != 0:
-                rico_pelvis = - 1 / rico_list[0][2]
-            else:
-                rico_pelvis = np.sign(rico_shoulder) * 5000
-
-            angle_pelvis = calculate_angle_for_torso(0, rico_pelvis)
-
-            coords_with_angle.append(('pelvis', angle_pelvis))
-            current_angle = angle_pelvis
-
-        coords_with_angle.append((first[1], current_angle + angle))
-        current_angle = current_angle + angle
-
-        if second[1] == 'shoulder' and need_to_solve_issue_shoulder:
-
-            if rico_list[-1][2] != 0:
-                rico_shoulder = -1 / rico_list[-1][2]
-            else:
-                rico_shoulder = np.sign(rico_pelvis) * 5000
-
-            angle_shoulder = calculate_angle_for_torso(0, rico_pelvis)
-
-            coords_with_angle.append(('shoulder', angle_shoulder))
-
-        counter += 1
-
-    if not need_to_solve_issue_shoulder:
-        coords_with_angle.append(('shoulder', angle_shoulder))
-
-    return coords_with_angle
-
-
-def ccw(A, B, C):
-    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
-
-
-def intersect(A, B, C, D):
-    """ Return true if line segments AB and CD intersect"""
-    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
-
-
-def find_coordinates_on_torso(coords_with_distance, coords_with_angle, pose_estimation_dict):
-    """ This method will find the coordinates on the torso of the salamander."""
-
-    lower_coordinates = []
-    upper_coordinates = []
-
-    for name, distance in coords_with_distance:
-        angle = None
-
-        for name2, angle2 in coords_with_angle:
-            if name == name2:
-                angle = angle2
-                break
-
-        if name == 'pelvis':
-            base_coordinate = pose_estimation_dict['spine_lowest'][:2]
-
-        elif name == 'shoulder':
-            base_coordinate = pose_estimation_dict['spine_highest'][:2]
-
-        else:
-            base_coordinate = pose_estimation_dict[name][:2]
-
-        lower_coordinate_x = int(base_coordinate[0] - distance * math.cos(math.radians(angle)))
-        lower_coordinate_y = int(base_coordinate[1] - distance * math.sin(math.radians(angle)))
-
-        upper_coordinate_x = int(base_coordinate[0] + distance * math.cos(math.radians(angle)))
-        upper_coordinate_y = int(base_coordinate[1] + distance * math.sin(math.radians(angle)))
-
-        lower_coordinates.append([lower_coordinate_x, lower_coordinate_y])
-        upper_coordinates.append([upper_coordinate_x, upper_coordinate_y])
-
-    lower_coordinates.reverse()
-
-    # We make sure the perimeter does not intersect with itself.
-    if intersect(upper_coordinates[-2], upper_coordinates[-1], lower_coordinates[0], lower_coordinates[1]):
-        temp = upper_coordinates[-1]
-        upper_coordinates[-1] = lower_coordinates[0]
-        lower_coordinates[0] = temp
-
-    coordinates = upper_coordinates + lower_coordinates
-
-    # Add starting point also to the end of the list since the start and end point is the same.
-    coordinates.append(coordinates[0])
-
-    return np.array(coordinates)
-
-
-def remove_everything_outside_curve(image, tck):
-    """ This function converts everything outside the given curve, thus only the belly will remain with black
-    background."""
-
-    u_dense = np.linspace(0, 1, 500)
-    x_dense, y_dense = splev(u_dense, tck)
-
-    x_dense = np.clip(x_dense, 0, image.shape[1] - 1).astype(np.int32)
-    y_dense = np.clip(y_dense, 0, image.shape[0] - 1).astype(np.int32)
-
-    mask = np.zeros(image.shape[:2], dtype=np.uint8)
-
-    contour = np.stack((x_dense, y_dense), axis=1)
-    cv.fillPoly(mask, [contour], color=[255])
-
-    output = cv.bitwise_and(image, image, mask=mask)
-
-    return output
-
-
 def resize(image, width=None, height=750, inter=cv.INTER_AREA):
     """ Resizes the image with aspect ratio equal to width and height. """
     (h, w) = image.shape[:2]
@@ -918,20 +523,24 @@ def resize(image, width=None, height=750, inter=cv.INTER_AREA):
     return cv.resize(image, dim, interpolation=inter)
 
 
-def crop_image(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, float]],
-               is_background_removed: bool = False, pose_estimation_evaluation: int = 0):
-    # Only gets used in facade.py
-    """ This method will literally crop the image. So we remove the non-interesting background.
-    This removes everything except (the belly) of the salamander.
+def crop_image(image, crop_to_belly: bool = True):  # Only gets used in facade.py
+    """ This method will literally crop the image. So we remove the non-interesting, white background.
+    This removes everything except the belly of the salamander.
 
-    Further documentation: see documentation from isolate_salamander. """
+    INPUT: image
+    INPUT: crop_to_belly = True means that the image gets cropped until only the belly remains. If it is False, then
+    the entire salamander (with paws and head and so on) remains (this case usually means that the pose estimation did
+    not work well)."""
 
-    image = isolate_salamander(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
+    try:
+        image = isolate_salamander(image, crop_to_belly=crop_to_belly)
+    except:
+        return image
+    else:
+        image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        x, y, w, h = cv.boundingRect(image_gray)
 
-    image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    x, y, w, h = cv.boundingRect(image_gray)
+        # Now crop the image to the bounding box.
+        cropped_image = image[y: y + h, x: x + w]
 
-    # Now crop the image to the bounding box.
-    cropped_image = image[y: y + h, x: x + w]
-
-    return cropped_image
+        return cropped_image

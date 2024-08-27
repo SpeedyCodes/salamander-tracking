@@ -2,7 +2,8 @@ from typing import Dict, Tuple
 import numpy as np
 from src.pose_estimation.estimate import estimate_pose_from_image
 from src.dot_detection import dot_detect_haar
-from src.preprocessing import crop_image, normalise_coordinates
+from src.preprocessing import normalise_coordinates
+from src.preprocessing.isolate_salamander import crop_image
 from src.pattern_matching import compare_dot_patterns
 
 """
@@ -12,41 +13,84 @@ Internally, it defines from a high level the pipeline of operations that need to
 """
 
 
-def main_body_parts_to_coordinates(image: np.ndarray) -> Tuple[np.ndarray, Dict[str, Tuple[int, int, float]]]:
+def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
     """
-    Takes in an image and returns the coordinates of the main body parts of the salamander.
     :param image:
-    :return: The main body parts of the salamander.
+    :return: A cropped version of the image. In this cropped version, we only see the belly of the salamander,
+    or the whole salamander if so wished.
     """
 
-    h, w = image.shape[:2]
+    # First, try to use pose estimation.
+    pose_estimation_evaluation = 2
+    is_background_removed = False
+    no_background = None
+    cropped_image = None
 
-    # Case 1, the image is too big for the pose estimation.
-    if h > 2500 or w > 2500:  # TODO : This is temporary until we can have a check if it works or not.
+    coordinates_pose, succes = estimate_pose_from_image(image)
 
-        # Obtains the image without background, but still full salamander.
-        image = crop_image(image, crop_to_belly=False)
+    if not succes:
+        # Try to crop the image such that it is smaller.
+        pose_estimation_evaluation -= 1
 
-        # Now try the pose estimation again on the smaller image.
-        main_body_parts, success = estimate_pose_from_image(image)
+    if pose_estimation_evaluation == 1:
+        try:
+            # Remove the background.
+            no_background = crop_image(image, coordinates_pose, False, pose_estimation_evaluation)
+        except:
+            pose_estimation_evaluation = 0
+        else:
+            is_background_removed = True
+            pose_estimation_evaluation += 1
 
-    # Case 2, the image is small enough for the pose estimation.
-    else:
-        main_body_parts, success = estimate_pose_from_image(image)
+    if pose_estimation_evaluation == 2 and is_background_removed:
+        # Try pose estimation again on smaller image.
+        coordinates_pose, succes = estimate_pose_from_image(no_background)
 
-    return image, main_body_parts
+        if not succes:
+            pose_estimation_evaluation = 0
+
+    if pose_estimation_evaluation == 2:
+
+        if is_background_removed:
+
+            try:
+                cropped_image = crop_image(no_background, coordinates_pose, is_background_removed,
+                                           pose_estimation_evaluation)
+            except:
+                pose_estimation_evaluation = 0
+
+        else:
+            try:
+                cropped_image = crop_image(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
+            except:
+                pose_estimation_evaluation = 0
+
+    if pose_estimation_evaluation == 0:
+
+        if is_background_removed:
+            try:
+                cropped_image = crop_image(no_background, coordinates_pose, is_background_removed,
+                                           pose_estimation_evaluation)
+            except:
+                cropped_image = no_background
+
+        else:
+            try:
+                cropped_image = crop_image(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
+            except:
+                cropped_image = image
+
+    return cropped_image
 
 
 def image_to_canonical_representation(image: np.ndarray) -> set[tuple[float, float]]:
     """
-    Takes in an image and returns the canonical representation of the image that is returned from
-    main_body_parts_to_coordinates.
-    :param:  The image that is returned from main_body_parts_to_coordinates
-    :return: The canonical representation of the coordinates of the dots on the salamander's skin in the image
+    Takes in an image and returns the canonical (normalized) representation of the coordinates.
+    :param:  image
+    :return: The canonical representation of the coordinates of the dots on the salamander's skin in the image.
     """
-
-    cropped_image = crop_image(image)  # Fully crops, only the belly of the salamander remains.
-    list_haar_cascade = dot_detect_haar(image)
+    cropped_image = crop_image_to_belly(image)
+    list_haar_cascade = dot_detect_haar(cropped_image)
     list_coordinates = normalise_coordinates(list_haar_cascade, cropped_image.shape)
 
     return list_coordinates
