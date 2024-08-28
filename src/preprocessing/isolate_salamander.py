@@ -67,7 +67,7 @@ def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, i
         return image_no_background
 
     elif value == 2:  # We need to isolate the belly of the salamander using pose estimation.
-        tck, points = find_torso(coordinates_pose, image)
+        tck, points = find_torso(coordinates_pose)
 
         image_belly_with_pose_estimation = remove_everything_outside_curve(image, tck)
 
@@ -286,10 +286,8 @@ def filter_contours_concentric(good_contours):
 
     # Drawing an ellipse around the biggest contour. Now we just need to check if the other contours completely lie
     # in this ellipse. If this is True, then we remove the biggest contour.
-    if len(biggest) == 4:
-        raise Exception('Only contour found is the trivial one, please try again with a better image!')
-
-    assert len(biggest) >= 5, 'No good contours found!'
+    assert len(biggest) != 4, 'Only contour found is the trivial one, please try again with a better image!'
+    assert len(biggest) >= 5, 'No good contours were found!'
     ellipse = cv.fitEllipse(biggest)
     (center, axes, angle) = ellipse
     (major_axis, minor_axis) = axes
@@ -599,14 +597,14 @@ def assert_coordinates_from_pose_estimation(coordinates):
         assert False, 'No spine highest and lowest coordinates were detected.'
 
 
-def find_torso(pose_estimation_dict, image):
+def find_torso(pose_estimation_dict):
     """ This method tries to find the shape of the torso of the salamander via interpolation. This enables us to
     also detect torsos that are curved."""
 
     pose_estimation_dict = select_useful_coordinates_from_pose_estimation(pose_estimation_dict)
 
     coords_with_distance = compute_distances_for_torso(pose_estimation_dict)
-    coords_with_angle = compute_angle_for_torso(coords_with_distance, pose_estimation_dict, image)
+    coords_with_angle = compute_angle_for_torso(coords_with_distance, pose_estimation_dict)
 
     points = find_coordinates_on_torso(coords_with_distance, coords_with_angle, pose_estimation_dict)
 

@@ -1,4 +1,3 @@
-from typing import Dict, Tuple
 import numpy as np
 from src.pose_estimation.estimate import estimate_pose_from_image
 from src.dot_detection import dot_detect_haar
@@ -36,7 +35,7 @@ def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
         try:
             # Remove the background.
             no_background = crop_image(image, coordinates_pose, False, pose_estimation_evaluation)
-        except:
+        except AssertionError:
             pose_estimation_evaluation = 0
         else:
             is_background_removed = True
@@ -56,13 +55,13 @@ def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
             try:
                 cropped_image = crop_image(no_background, coordinates_pose, is_background_removed,
                                            pose_estimation_evaluation)
-            except:
+            except AssertionError:
                 pose_estimation_evaluation = 0
 
         else:
             try:
                 cropped_image = crop_image(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
-            except:
+            except AssertionError:
                 pose_estimation_evaluation = 0
 
     if pose_estimation_evaluation == 0:
@@ -71,13 +70,13 @@ def crop_image_to_belly(image: np.ndarray) -> np.ndarray:
             try:
                 cropped_image = crop_image(no_background, coordinates_pose, is_background_removed,
                                            pose_estimation_evaluation)
-            except:
+            except AssertionError:
                 cropped_image = no_background
 
         else:
             try:
                 cropped_image = crop_image(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
-            except:
+            except AssertionError:
                 cropped_image = image
 
     return cropped_image
