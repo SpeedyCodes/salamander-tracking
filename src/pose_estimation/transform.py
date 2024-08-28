@@ -78,23 +78,23 @@ class CoordinateTransformer:
 
     def _transform_spine(self):
         # remaps the original data points of the spine to a straight line
-
+        # not used anymore, just keep it for visualisation
 
         # middle point is the same
-        self.x_remapped[self.middle_point_t] = self.x_given[self.middle_point_t]
-        self.y_remapped[self.middle_point_t] = self.y_given[self.middle_point_t]
+        self.x_remapped[0] = self.x_given[0]
+        self.y_remapped[0] = self.y_given[0]
 
-        # work outwards from the middle point
-        for delta in [-1, 1]:
-            base_point_t = self.middle_point_t
-            new_point_t = self.middle_point_t + delta
-            while 0 <= new_point_t < len(self.x_given):
-                self.x_remapped[new_point_t] = self.x_remapped[base_point_t]
-                distance_between_points = abs(self._arc_length(base_point_t, new_point_t))
-                self.y_remapped[new_point_t] = self.y_given[base_point_t] + delta * distance_between_points
+        # work downwards from the highest point
+        delta = 1
+        base_point_t = 0
+        new_point_t = delta
+        while 0 <= new_point_t < len(self.x_given):
+            self.x_remapped[new_point_t] = self.x_remapped[base_point_t]
+            distance_between_points = abs(self._arc_length(base_point_t, new_point_t))
+            self.y_remapped[new_point_t] = self.y_remapped[base_point_t] + delta * distance_between_points
 
-                base_point_t = new_point_t
-                new_point_t += delta
+            base_point_t = new_point_t
+            new_point_t += delta
 
     def _arc_length(self, t_start: int, t_end: int):
         return integrate.quad(self.arc_length_integrand, t_start, t_end)[0]
@@ -128,18 +128,18 @@ class CoordinateTransformer:
         sign = np.sign(np.cross(lower_to_closest, lower_to_upper))
         distance *= sign
 
-        # get the length of spline between the closest point and the spine_middle
-        spine_part_needed = closest_point_t / (len(self.used_points) - 1)
-        full_spine_length = self.y_remapped.max() - self.y_remapped.min()
-        spine_length = spine_part_needed * full_spine_length
-        new_point_x = self.x_remapped[self.middle_point_t] + distance
-        new_point_y = self.y_remapped.min() + spine_length
+        # get the length of spline between the upper point and the spine_middle
+        spine_length_needed = abs(self._arc_length(0, closest_point_t))
+        # normalize the distances to the length of the spine
+        full_spine_length = self._arc_length(0, len(self.x_given) - 1)
+        new_point_x = distance / full_spine_length
+        new_point_y = spine_length_needed / full_spine_length
 
         # TODO removeme
         cv2.circle(image, closest_point, 5, (0, 255, 0), -1)
         cv2.putText(image, "closest point on spine", closest_point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.line(image, (x, y), closest_point, (0, 255, 0))
-        cv2.circle(image, (int(new_point_x), int(new_point_y)), 5, (0, 0, 0), -1)
+        cv2.circle(image, (int(new_point_x + self.x_remapped[0]), int(new_point_y + self.y_remapped[0])), 5, (0, 0, 0), -1)
         cv2.putText(image, "new", (int(new_point_x), int(new_point_y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
         return new_point_x, new_point_y
