@@ -10,6 +10,7 @@ Internally, it defines from a high level the pipeline of operations that need to
 
 """
 
+
 class CoordinateExtractor:
 
     def __init__(self, image: np.ndarray):
@@ -38,7 +39,8 @@ class CoordinateExtractor:
         if pose_estimation_evaluation == 1:
             try:
                 # Remove the background.
-                no_background = crop_image(self.image, self.coordinates_pose, False, pose_estimation_evaluation)
+                no_background = crop_image(self.image, self.coordinates_pose, False,
+                                           pose_estimation_evaluation)
             except AssertionError:
                 pose_estimation_evaluation = 0
             else:
@@ -52,36 +54,25 @@ class CoordinateExtractor:
             if not self.pose_estimation_success:
                 pose_estimation_evaluation = 0
 
-        if pose_estimation_evaluation == 2:
-            # Crop by using pose_estimation.
+        while pose_estimation_evaluation == 0 or pose_estimation_evaluation == 2:
+            # If equal to 2, then we use the pose estimation based method, otherwise we use the old method.
+
             if is_background_removed:
-
-                try:
-                    cropped_image = crop_image(no_background, self.coordinates_pose, is_background_removed,
-                                               pose_estimation_evaluation)
-                except AssertionError:
-                    pose_estimation_evaluation = 0
-
+                current_image = no_background
             else:
-                try:
-                    cropped_image = crop_image(self.image, self.coordinates_pose, is_background_removed, pose_estimation_evaluation)
-                except AssertionError:
+                current_image = self.image
+
+            try:
+                cropped_image = crop_image(current_image, self.coordinates_pose, is_background_removed,
+                                           pose_estimation_evaluation)
+            except AssertionError:
+                if pose_estimation_evaluation == 2:
                     pose_estimation_evaluation = 0
-
-        if pose_estimation_evaluation == 0:
-            # Use the old methods to crop the image.
-            if is_background_removed:
-                try:
-                    cropped_image = crop_image(no_background, self.coordinates_pose, is_background_removed,
-                                               pose_estimation_evaluation)
-                except AssertionError:
-                    cropped_image = no_background
-
+                else:
+                    cropped_image = current_image
+                    pose_estimation_evaluation = None  # To break out the while loop.
             else:
-                try:
-                    cropped_image = crop_image(self.image, self.coordinates_pose, is_background_removed, pose_estimation_evaluation)
-                except AssertionError:
-                    cropped_image = self.image
+                pose_estimation_evaluation = None  # To break out the while loop.
 
         return cropped_image
 

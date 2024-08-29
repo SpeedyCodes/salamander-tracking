@@ -13,7 +13,7 @@ collection = db["individuals"]
 
 
 images = []
-location = "D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/input/"
+location = "C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/"
 for year in ["2018/", "2019/", "2021/", "2022/", "2024/"]:
     for sal in filenames_from_folder(f'{location}{year}'):
         img = wrapped_imread(f'{location}{year}{sal}')
