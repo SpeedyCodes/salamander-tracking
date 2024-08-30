@@ -644,6 +644,7 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
     at the torso of the salamander (which are not detected by the pose estimation). """
 
     distances = []
+    scaler = 1.2
 
     if 'left_shoulder' not in pose_estimation_dict:
         shoulder_distance = math.dist(pose_estimation_dict['right_shoulder'][:2],
@@ -661,7 +662,7 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
         shoulder_distance = np.average([left_shoulder_distance, right_shoulder_distance])
 
         # Enlarge the distance a bit such that we make sure the whole belly is captured.
-        shoulder_distance = shoulder_distance * 1.2
+        shoulder_distance = shoulder_distance * scaler
 
     if 'left_pelvis' not in pose_estimation_dict:
         pelvis_distance = math.dist(pose_estimation_dict['right_pelvis'][:2],
@@ -677,7 +678,7 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
         pelvis_distance = np.average([left_pelvis_distance, right_pelvis_distance])
 
         # Enlarge the distance a bit such that we make sure the whole belly is captured.
-        pelvis_distance = pelvis_distance * 1.2
+        pelvis_distance = pelvis_distance * scaler
 
     if pelvis_distance >= shoulder_distance:
         delta_pelvis_shoulder = pelvis_distance - shoulder_distance
