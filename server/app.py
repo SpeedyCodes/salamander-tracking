@@ -1,64 +1,128 @@
 from flask import Flask, request, Response
 import cv2
 import numpy as np
+from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
+from server.database_interface import *
+from dataclasses import dataclass, InitVar, asdict
+from typing import List, Tuple, Set, Optional
+from datetime import datetime
 
 app = Flask(__name__)
 
 
-@app.route('/')
-def index():
-    return 'Hello, World!'
+@dataclass
+class Individual:
+    name: str
+    sighting_ids: List[str]
+    _id: Optional[str] = None
+    coordinates: Optional[List[tuple[float, float]]] = None
+    collection_name: InitVar[str] = "individuals"
 
-@app.route('/recognize', methods=['POST'])
+
+@dataclass
+class Sighting:
+    individual_id: Optional[str]
+    image_id: str
+    _id: Optional[str] = None
+    coordinates: Optional[List[tuple[float, float]]] = None
+    date: Optional[datetime] = None
+    collection_name: InitVar[str] = "sightings"
+
+
+def encode_image(image: np.ndarray):
+    return cv2.imencode('.jpg', image)[1].tobytes()
+
+
+def decode_image(bytestring: bytes):
+    image = np.frombuffer(bytestring, dtype=np.uint8)
+    return cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+
+@app.route('/store_sighting', methods=['POST'])
 def recognize():
     """
     Performs recognition and returns candidates with their confidence levels.
-    The submitted image is saved to be confirmed later.
+    The submitted image is saved as a sighting to be confirmed later.
     """
-    image = request.data
-    image = np.frombuffer(image, dtype=np.uint8)
-    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-    cv2.imwrite('image.jpg', image)
-    return {
-        "transient_id": 1,
-        "candidates": [
-            {
-                "name": "John Doe",
-                "id": 1, 
-                "confidence": 0.9
-            },
-            {
-                "name": "Jane Doe",
-                "id": 2,
-                "confidence": 0.8
-            }
-        ]
-    }
-    
-@app.route('/confirm/<int:transient_id>', methods=['POST'])
-def confirm():
-    """
-    Confirms the identity of the candidate with the given transient_id.
-    """
-    
-    existing_id = request.json['id']
-    return
-    
-@app.route('/register_new/<int:transient_id>', methods=['POST'])
-def register_new():
-    """
-    Registers a new salamander with the given transient_id.
-    """
-    
-    return
+    image_bytes = request.data
+    image_id = store_file(image_bytes)
+    # coordinates = image_to_canonical_representation(image)
+    sighting = Sighting(individual_id=None, image_id=image_id)
+    sighting_id = store_dataclass(sighting)
 
-@app.route('/info/<int:id>', methods=['POST'])
+    cursor: CursorType = individuals.find()
+    list = [{"individual_id": str(doc["_id"]), "confidence": 0.9} for doc in cursor]
+
+    return {
+        "sighting_id": sighting_id,
+        "candidates": list
+    }
+
+
+@app.route('/confirm/<string:sighting_id>', methods=['POST'])
+def confirm(sighting_id):
+    """
+    Confirms the identity of the sighting with the given sighting_id,
+    or creates a new individual if the salamander is not in the database.
+    """
+    individual_id = request.args.get('individual_id')
+    body = request.json
+    if not individual_id:  # if the individual is new
+        sighting: Sighting = get_dataclass(sighting_id, Sighting)
+        individual = Individual(name=body["nickname"], coordinates=sighting.coordinates, sighting_ids=[sighting._id])
+        individual_id = store_dataclass(individual)
+    else:  # if the individual is already in the database
+        db["individuals"].update_one({"_id": ObjectId(individual_id)},
+                                     {"$push": {"sighting_ids": ObjectId(sighting_id)}})
+    set_field(sighting_id, "individual_id", individual_id, Sighting)
+    set_field(sighting_id, "date", body["spotted_at"], Sighting)
+    return Response(status=200)
+
+
+@app.route('/individuals/<string:id>', methods=['GET'])
 def info(id):
     """
     Returns the information of the salamander with the given id.
-    """    
-    
-    return Response(cv2.imencode('.jpg', cv2.imread('image.jpg'))[1].tobytes(), mimetype='image/png')
+    """
+
+    individual = get_dataclass(id, Individual)
+    return asdict(individual)
+
+
+@app.route('/individuals', methods=['GET'])
+def all_individuals():
+    """
+    Returns the information of all the salamanders in the database.
+    """
+
+    individuals = get_all(Individual)
+    return [asdict(individual) for individual in individuals]
+
+
+@app.route('/individuals/<string:id>/image', methods=['GET'])
+def individual_image(id):
+    """
+    Returns an image of the salamander with the given id.
+    """
+
+    # get one of the sightings where the individual_id is the given id
+    cursor: CursorType = sightings.find({"individual_id": ObjectId(id)})
+    list = [Sighting(**doc) for doc in cursor]
+    sighting: Sighting = list[0]
+    image = get_file(sighting.image_id)
+    return Response(image, mimetype='image/png')
+
+
+@app.route('/get_sighting/<string:id>/image', methods=['GET'])
+def sighting_image(id):
+    """
+    Returns the image of the sighting with the given id.
+    """
+
+    sighting: Sighting = get_dataclass(id, Sighting)
+    image = get_file(sighting.image_id)
+    return Response(image, mimetype='image/png')
+
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
