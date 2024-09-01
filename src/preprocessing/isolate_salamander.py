@@ -63,7 +63,6 @@ def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, i
 
     elif value == 1:  # We need to remove the background, but leave salamander intact.
         image_no_background, _ = remove_background_old_methods(image)
-
         return image_no_background
 
     elif value == 2:  # We need to isolate the belly of the salamander using pose estimation.
@@ -129,7 +128,6 @@ def color_segmentation(image, ksize, lower_bound, upper_bound):
     mask_color = clean_mask(mask_color, ksize)
 
     image_with_mask = cv.bitwise_and(image, image, mask=mask_color)  # Apply mask to image.
-
     return image_with_mask, mask_color
 
 
@@ -917,7 +915,7 @@ def resize(image, width=None, height=750, inter=cv.INTER_AREA):
     return cv.resize(image, dim, interpolation=inter)
 
 
-def crop_image(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, float]],
+def crop_image(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, float]] | None = None,
                is_background_removed: bool = False, pose_estimation_evaluation: int = 0):
     # Only gets used in facade.py
     """ This method will literally crop the image. So we remove the non-interesting background.

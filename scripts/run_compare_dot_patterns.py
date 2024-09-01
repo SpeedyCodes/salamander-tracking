@@ -7,7 +7,6 @@ from src.facade import image_to_canonical_representation
 from server.database_interface import get_individuals_coords
 from time import time
 import threading
-
 database = []
 year_list = ['2018/', '2019/', '2021/', '2022/', '2024/']
 location = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'

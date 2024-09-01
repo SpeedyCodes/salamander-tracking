@@ -55,7 +55,6 @@ def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
     # Select the points to be used from the coordinates of the unknown image
     list_coordinates = select_points_to_be_matched(unknown_image_coordinates, tol=3 * tol)
 
-
     start_time = time()
 
     def matching_procedure(name_image_from_database, list_coordinates_image_from_database):
@@ -152,7 +151,6 @@ def run_through_algorithm(list_coordinates, list_coordinates_image_database, tol
                                                    total_nr_triangles_before_matching=len(list_triangles))
 
     return matched_points, V, f_t, V_max
-
 
 
 """ STEP 1: Selecting the points to be matched."""
@@ -696,7 +694,6 @@ def display_results(image: np.ndarray, database: dict[str, np.ndarray],
     """ This method will display the three best matches to the user.
 
     INPUT: list_of_scores is of the form [ (S1, S1_rel, S2, keyword, name), ... ]. """
-
 
     # Select the top three matches.
     top_matches = list_of_scores[:3]
