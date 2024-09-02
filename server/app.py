@@ -113,7 +113,7 @@ def individual_image(id):
     return Response(image, mimetype='image/png')
 
 
-@app.route('/get_sighting/<string:id>/image', methods=['GET'])
+@app.route('/sightings/<string:id>/image', methods=['GET'])
 def sighting_image(id):
     """
     Returns the image of the sighting with the given id.
@@ -122,6 +122,21 @@ def sighting_image(id):
     sighting: Sighting = get_dataclass(id, Sighting)
     image = get_file(sighting.image_id)
     return Response(image, mimetype='image/png')
+
+@app.route('/sightings', methods=['GET'])
+def get_sightings():
+    """
+    Returns the information of all the sightings in the database.
+    """
+
+    sightings = get_all(Sighting)
+    list = [asdict(sighting) for sighting in sightings if sighting.individual_id is not None]
+    for sighting in list:
+        sighting.pop("coordinates")
+        sighting["individual_name"] = get_dataclass(sighting["individual_id"], Individual).name
+
+    return list
+
 
 
 if __name__ == '__main__':
