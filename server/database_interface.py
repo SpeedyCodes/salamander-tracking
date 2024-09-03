@@ -23,7 +23,10 @@ def wrap_object_id(dataclass_instance):
 def unwrap_object_id(dataclass_instance):
     for field in fields(dataclass_instance):
         if "_id" in field.name:
-            setattr(dataclass_instance, field.name, str(getattr(dataclass_instance, field.name)))
+            if hasattr(field.type, "_name") and field.type._name == "List":
+                setattr(dataclass_instance, field.name, [str(id) for id in getattr(dataclass_instance, field.name)])
+            elif getattr(dataclass_instance, field.name) is not None:
+                setattr(dataclass_instance, field.name, str(getattr(dataclass_instance, field.name)))
     return dataclass_instance
 
 def get_individuals_coords():
