@@ -46,16 +46,17 @@ def recognize():
     """
     image_bytes = request.data
     image_id = store_file(image_bytes)
-    # coordinates = image_to_canonical_representation(image)
-    sighting = Sighting(individual_id=None, image_id=image_id)
+    image = decode_image(image_bytes)
+    coordinates = image_to_canonical_representation(image)
+
+
+    candidates = match_canonical_representation_to_database(coordinates, 4)
+    converted_list = [{"individual_id": get_dataclass(candidate[4], Sighting).individual_id, "confidence": 0.9} for candidate in candidates]
+    sighting = Sighting(individual_id=None, image_id=image_id, coordinates=list(coordinates))
     sighting_id = store_dataclass(sighting)
-
-    cursor: CursorType = individuals.find()
-    list = [{"individual_id": str(doc["_id"]), "confidence": 0.9} for doc in cursor]
-
     return {
         "sighting_id": sighting_id,
-        "candidates": list
+        "candidates": converted_list
     }
 
 

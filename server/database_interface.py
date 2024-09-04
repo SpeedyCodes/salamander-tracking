@@ -30,14 +30,13 @@ def unwrap_object_id(dataclass_instance):
     return dataclass_instance
 
 def get_individuals_coords():
-    cursor: CursorType = individuals.find()
+    cursor: CursorType = sightings.find()
     # change the coords to a list of tuples to make it hashable
-    # also remove the _id field
-    list = [(doc["name"], [(coords[0], coords[1]) for coords in doc["coordinates"]]) for doc in cursor]
+    list = [(str(doc["_id"]), [(coords[0], coords[1]) for coords in doc["coordinates"]]) for doc in cursor]
     return list
 
 def get_individual_coords(name):
-    doc = collection.find_one({"name": name})
+    doc = individuals.find_one({"name": name})
     return [(coords[0], coords[1]) for coords in doc["coordinates"]]
 def store_dataclass(dataclass):
     dataclass = wrap_object_id(dataclass)

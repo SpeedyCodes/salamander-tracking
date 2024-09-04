@@ -3,6 +3,7 @@ from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
 from src.dot_detection import dot_detect_haar
 from src.preprocessing import normalise_coordinates, crop_image
 from src.pattern_matching import compare_dot_patterns
+from server.database_interface import get_individuals_coords
 
 """
 The Facade abstracts away the intricacies of salamander recognition and matching to make it more accessible.
@@ -101,14 +102,13 @@ def image_to_canonical_representation(image: np.ndarray) -> set[tuple[float, flo
     return coordinate_extractor.extract()
 
 
-def match_canonical_representation_to_database(canonical_representation: set[tuple[float, float]]) -> str | None:
+def match_canonical_representation_to_database(canonical_representation: set[tuple[float, float]], candidates_number) -> str | None:
     """
     Matches the canonical representation of the image to an entry in the database
     :param canonical_representation:
     :return: The name of the salamander in the database
     """
-    database = []  # TODO
+    database = get_individuals_coords()
     scores = compare_dot_patterns(canonical_representation, database)
-    if len(scores) == 0:
-        return None
-    return scores[1]
+    actual_candidates_number = min(candidates_number, len(scores))
+    return scores[:actual_candidates_number]
