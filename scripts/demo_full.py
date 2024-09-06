@@ -15,8 +15,9 @@ from src.dot_detection.dot_detect_haar import dot_detect_haar
 from src.preprocessing import normalise_coordinates
 from src.preprocessing.isolate_salamander import isolate_salamander, crop_image
 from src.utils import wrapped_imread
-from server.database_interface import get_individuals_coords
+from server.database_interface import get_individuals_coords, get_dataclass, get_file
 from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
+from server.app import Sighting, Individual, decode_image
 import cv2 as cv
 
 voorbeeld = 4
@@ -104,10 +105,15 @@ if __name__ == '__main__':
         # run_compare_dot_patterns.py.
         coords_database = get_individuals_coords()
 
-        list_coordinates = image_to_canonical_representation(images_from_the_database)
+        list_coordinates = image_to_canonical_representation(unknown_image)
         list_of_scores = compare_dot_patterns(list_coordinates, coords_database)
 
         # Convert the database in a dictionary for easy acces.
-        database = {name: image for image, name in database}
+        database = {}
+        for id, coords in coords_database:
+            sighting: Sighting = get_dataclass(id, Sighting)
+            image = get_file(sighting.image_id)
+            # individual: Individual = get_dataclass(sighting.individual_id, Individual)
+            database[id] = decode_image(image)
         # Plotting the results.
         display_results(unknown_image, database, list_of_scores)
