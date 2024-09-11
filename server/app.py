@@ -52,6 +52,14 @@ def recognize():
 
     candidates = match_canonical_representation_to_database(coordinates, 4)
     converted_list = [{"individual_id": get_dataclass(candidate[4], Sighting).individual_id, "confidence": 0.9} for candidate in candidates]
+    # filter out all but the first candidate of every individual_id
+
+    for i in range(len(converted_list)):
+        for j in range(i + 1, len(converted_list)):
+            if converted_list[i]["individual_id"] == converted_list[j]["individual_id"]:
+                converted_list[j]["individual_id"] = None
+    converted_list = [item for item in converted_list if item["individual_id"] is not None]
+
     sighting = Sighting(individual_id=None, image_id=image_id, coordinates=list(coordinates))
     sighting_id = store_dataclass(sighting)
     return {

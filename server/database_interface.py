@@ -3,7 +3,7 @@ from bson import ObjectId
 from pymongo import MongoClient, CursorType
 from dataclasses import asdict, fields
 
-from server.config import MONGO_CONNECTION_STRING
+from config import MONGO_CONNECTION_STRING
 client = MongoClient(MONGO_CONNECTION_STRING)
 
 db = client["Salamanders"]
