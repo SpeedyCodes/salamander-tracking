@@ -51,14 +51,30 @@ def recognize():
 
 
     candidates = match_canonical_representation_to_database(coordinates, 4)
-    converted_list = [{"individual_id": get_dataclass(candidate[4], Sighting).individual_id, "confidence": 0.9} for candidate in candidates]
-    # filter out all but the first candidate of every individual_id
 
-    for i in range(len(converted_list)):
-        for j in range(i + 1, len(converted_list)):
-            if converted_list[i]["individual_id"] == converted_list[j]["individual_id"]:
-                converted_list[j]["individual_id"] = None
-    converted_list = [item for item in converted_list if item["individual_id"] is not None]
+    converted_list = [{
+        "confidence": 0.9,
+        "sighting": get_dataclass(candidate[4], Sighting)
+    }
+        for candidate in candidates]
+    i = 0
+    while i < len(converted_list):
+        sighting = converted_list[i]["sighting"]
+        if sighting.individual_id is None:
+            continue
+        # filter out all but the first candidate of every individual_id
+        # also, remove candidates that have no individual_id
+        j = i + 1
+        while j < len(converted_list):
+            if sighting.individual_id == converted_list[j]["sighting"].individual_id or converted_list[j]["sighting"].individual_id is None:
+                converted_list.pop(j)
+            else:
+                j += 1
+                i -= 1
+
+        converted_list[i]["individual"] = get_dataclass(converted_list[i]["sighting"].individual_id, Individual)
+        i += 1
+
 
     sighting = Sighting(individual_id=None, image_id=image_id, coordinates=list(coordinates))
     sighting_id = store_dataclass(sighting)
@@ -140,6 +156,9 @@ def get_sightings():
 
     sightings = get_all(Sighting)
     list = [asdict(sighting) for sighting in sightings if sighting.individual_id is not None]
+
+    if "individual_id" in request.args:
+        list = [sighting for sighting in list if sighting["individual_id"] == request.args["individual_id"]]
     for sighting in list:
         sighting.pop("coordinates")
         sighting["individual_name"] = get_dataclass(sighting["individual_id"], Individual).name
