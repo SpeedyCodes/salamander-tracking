@@ -20,7 +20,7 @@ from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
 from server.app import Sighting, Individual, decode_image
 import cv2 as cv
 
-voorbeeld = 4
+voorbeeld = 5
 path = 'C:/Users/Erwin2/OneDrive/Documenten/UA/Honours Program/Interdisciplinary Project/Salamanders/'
 
 if __name__ == '__main__':
@@ -91,18 +91,8 @@ if __name__ == '__main__':
 
     if voorbeeld == 5:
         # Unknown image is the one that we just captured and photographed.
-        unknown_image = wrapped_imread(f'{path}2019/2019-Sal18.jpg')
-        pose, succes = estimate_pose_from_image(unknown_image)
-        image_isolated = crop_image(unknown_image, coordinates_pose=pose, pose_estimation_evaluation=2)
-        dots = dot_detect_haar(image_isolated)
+        unknown_image = wrapped_imread(f'{path}2018/2018-Sal04.jpg')
 
-        list_coordinates = normalise_coordinates(dots, image_isolated.shape)
-        coordinate_transformer = CoordinateTransformer(pose)
-        list_coordinates = set([coordinate_transformer.transform(*coordinate) for coordinate in list_coordinates])
-
-        # The goal is that we compare this unknown image with some other images in the database.
-        # But, Jesse, you can have a look at this and fix the code below. Maybe you can also have a look at
-        # run_compare_dot_patterns.py.
         coords_database = get_individuals_coords()
 
         list_coordinates = image_to_canonical_representation(unknown_image)

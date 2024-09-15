@@ -1,7 +1,7 @@
 import numpy as np
 from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
 from src.dot_detection import dot_detect_haar
-from src.preprocessing import normalise_coordinates, crop_image
+from src.preprocessing import isolate_salamander
 from src.preprocessing.coordinates import calculate_centroid_of_rectangle, normalisation_of_coordinates
 from src.pattern_matching import compare_dot_patterns
 from server.database_interface import get_individuals_coords
@@ -30,7 +30,7 @@ class CoordinateExtractor:
         pose_estimation_evaluation = 2
         is_background_removed = False
         no_background = None
-        cropped_image = None
+        isolate_image = None
 
         self.coordinates_pose, self.pose_estimation_success = estimate_pose_from_image(self.image)
 
@@ -41,7 +41,7 @@ class CoordinateExtractor:
         if pose_estimation_evaluation == 1:
             try:
                 # Remove the background.
-                no_background = crop_image(self.image, self.coordinates_pose, False,
+                no_background = isolate_salamander(self.image, self.coordinates_pose, False,
                                            pose_estimation_evaluation)
             except AssertionError:
                 pose_estimation_evaluation = 0
@@ -65,31 +65,31 @@ class CoordinateExtractor:
                 current_image = self.image
 
             try:
-                cropped_image = crop_image(current_image, self.coordinates_pose, is_background_removed,
-                                           pose_estimation_evaluation)
+                isolate_image = isolate_salamander(current_image, self.coordinates_pose, is_background_removed,
+                                                   pose_estimation_evaluation)
             except AssertionError:
                 if pose_estimation_evaluation == 2:
                     pose_estimation_evaluation = 0
                 else:
-                    cropped_image = current_image
+                    isolate_image = current_image
                     pose_estimation_evaluation = None  # To break out the while loop.
             else:
                 pose_estimation_evaluation = None  # To break out the while loop.
 
-        return cropped_image
+        return isolate_image
 
     def extract(self) -> set[tuple[float, float]]:
         """
         :return: The canonical representation of the coordinates of the dots on the salamander's skin in the image.
         """
-        cropped_image = self.crop_image_to_belly()
-        list_haar_cascade = dot_detect_haar(cropped_image)
+        isolate_image = self.crop_image_to_belly()
+        list_haar_cascade = dot_detect_haar(isolate_image)
         list_coordinates = [calculate_centroid_of_rectangle(*coordinate) for coordinate in list_haar_cascade]
         if self.pose_estimation_success:
             coordinate_transformer = CoordinateTransformer(self.coordinates_pose)
             normalised = set([coordinate_transformer.transform(*coordinate) for coordinate in list_coordinates])
         else:  # TODO check if the normalisation outside transform() doesn't need to happen even if pose estimation succeeds
-            normalised = [normalisation_of_coordinates(*coordinate, cropped_image.shape[1], cropped_image.shape[0]) for coordinate in list_coordinates]
+            normalised = [normalisation_of_coordinates(*coordinate, isolate_image.shape[1], isolate_image.shape[0]) for coordinate in list_coordinates]
 
         return normalised
 
