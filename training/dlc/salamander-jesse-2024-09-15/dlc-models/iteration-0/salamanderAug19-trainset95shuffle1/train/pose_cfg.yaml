@@ -1,0 +1,94 @@
+all_joints:
+- - 0
+- - 1
+- - 2
+- - 3
+- - 4
+- - 5
+- - 6
+- - 7
+- - 8
+- - 9
+- - 10
+- - 11
+- - 12
+- - 13
+- - 14
+- - 15
+all_joints_names:
+- head_tip
+- left_shoulder
+- left_hand_middle
+- right_shoulder
+- right_hand_middle
+- left_pelvis
+- left_foot_middle
+- right_pelvis
+- right_foot_middle
+- tail_connection
+- tail_end
+- spine_highest
+- spine_high
+- spine_middle
+- spine_low
+- spine_lowest
+alpha_r: 0.02
+apply_prob: 0.5
+batch_size: 1
+contrast:
+  clahe: true
+  claheratio: 0.1
+  histeq: true
+  histeqratio: 0.1
+convolution:
+  edge: false
+  emboss:
+    alpha:
+    - 0.0
+    - 1.0
+    strength:
+    - 0.5
+    - 1.5
+  embossratio: 0.1
+  sharpen: false
+  sharpenratio: 0.3
+cropratio: 0.4
+dataset: training-datasets\iteration-0\UnaugmentedDataSet_salamanderAug19\salamander_jesse95shuffle1.mat
+dataset_type: imgaug
+decay_steps: 30000
+display_iters: 1000
+global_scale: 0.8
+init_weights: D:\School\UAntwerpen\Honours\Salamander\salamander-tracking\training\dlc\salamander-jesse-2024-09-15\dlc-models\iteration-0\salamanderAug19-trainset95shuffle1\train\snapshot-210000
+intermediate_supervision: false
+intermediate_supervision_layer: 12
+location_refinement: true
+locref_huber_loss: true
+locref_loss_weight: 0.05
+locref_stdev: 7.2801
+lr_init: 0.0005
+max_input_size: 1500
+metadataset: training-datasets\iteration-0\UnaugmentedDataSet_salamanderAug19\Documentation_data-salamander_95shuffle1.pickle
+min_input_size: 64
+mirror: false
+multi_stage: false
+multi_step:
+- - 0.005
+  - 10000
+- - 0.02
+  - 430000
+- - 0.002
+  - 730000
+- - 0.001
+  - 1030000
+net_type: resnet_50
+num_joints: 16
+pairwise_huber_loss: false
+pairwise_predict: false
+partaffinityfield_predict: false
+pos_dist_thresh: 17
+project_path: D:/School/UAntwerpen/Honours/Salamander/salamander-tracking/training/dlc/salamander-jesse-2024-09-15
+rotation: 25
+rotratio: 0.4
+save_iters: 50000
+scale_jitter_lo: 0.5
+scale_jitter_up: 1.25

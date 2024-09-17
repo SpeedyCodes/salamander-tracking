@@ -10,6 +10,6 @@ csv_file_path = f"{output_file}.csv"
 h5_file_path = f"{output_file}.h5"
 pickle_file_path = f"{output_file}_meta.pickle"
 # path to DLC project config file
-config_file_path = "training/dlc/salamander-jesse-2024-08-19/config.yaml"
+config_file_path = "training/dlc/salamander-jesse-2024-09-15/config.yaml"
 # amount of time to wait inbetween polling for files
 patience = 0.01

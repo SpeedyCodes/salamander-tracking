@@ -50,7 +50,7 @@ def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, in
         return {}, False
 
     # read the CSV file that DLC generated
-    csv_file_path = f"{image_dir}/{uuid}DLC_resnet50_salamanderAug19shuffle1_210000.csv"
+    csv_file_path = f"{image_dir}/{uuid}DLC_resnet50_salamanderAug19shuffle1_300000.csv"
     lines = []
     with open(csv_file_path, "r") as file:
         for line in file:
