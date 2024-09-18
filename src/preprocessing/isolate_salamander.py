@@ -600,9 +600,20 @@ def select_useful_coordinates_from_pose_estimation(pose_estimation_dict):
     useful_names = ['spine_lowest', 'spine_low', 'spine_middle', 'spine_high', 'spine_highest', 'left_shoulder',
                     'right_shoulder', 'left_pelvis', 'right_pelvis']
 
-    for name in pose_estimation_dict:
+    # First select the points with the highest confidence.
+    for name, info in sorted(list(pose_estimation_dict.items()), key=lambda x: x[1][2], reverse=True):
+
+        check_close = False
         if name in useful_names and pose_estimation_dict[name][2] >= 0.70:
-            useful_coordinates[name] = pose_estimation_dict[name]
+
+            # If two points are too close together, we remove the point with the lowest confidence.
+            for name2 in useful_coordinates:
+                if math.dist(pose_estimation_dict[name][:2], useful_coordinates[name2][:2]) < 5:
+                    check_close = True
+                    break
+
+            if not check_close:
+                useful_coordinates[name] = pose_estimation_dict[name]
 
     assert_coordinates_from_pose_estimation(useful_coordinates)
 
@@ -760,6 +771,8 @@ def compute_angle_for_torso(coords_with_distance, pose_estimation_dict) -> list[
     and ending at the torso of the salamander."""
 
     rico_list = []
+    rico_pelvis = 0
+    rico_shoulder = 0
 
     # Calculate the slope coefficient between every two points.
     for first, second in zip(coords_with_distance, coords_with_distance[1:]):
@@ -847,7 +860,7 @@ def compute_angle_for_torso(coords_with_distance, pose_estimation_dict) -> list[
             else:
                 rico_shoulder = np.sign(rico_pelvis) * 5000
 
-            angle_shoulder = calculate_angle_for_torso(0, rico_pelvis)
+            angle_shoulder = calculate_angle_for_torso(0, rico_shoulder)
 
             coords_with_angle.append(('shoulder', angle_shoulder))
 

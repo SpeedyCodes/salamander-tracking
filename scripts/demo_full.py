@@ -12,12 +12,11 @@ legend:
 from src.facade import image_to_canonical_representation
 from src.pattern_matching import compare_dot_patterns, display_results
 from src.dot_detection.dot_detect_haar import dot_detect_haar
-from src.preprocessing import normalise_coordinates
 from src.preprocessing.isolate_salamander import isolate_salamander, crop_image
 from src.utils import wrapped_imread
 from server.database_interface import get_individuals_coords, get_dataclass, get_file
-from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
-from server.app import Sighting, Individual, decode_image
+from src.pose_estimation import estimate_pose_from_image
+from server.app import Sighting, decode_image
 import cv2 as cv
 
 voorbeeld = 5
