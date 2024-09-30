@@ -53,7 +53,7 @@ def recognize():
     candidates = match_canonical_representation_to_database(coordinates, 4)
 
     converted_list = [{
-        "confidence": 0.9,
+        "confidence": candidate[2],
         "sighting": get_dataclass(candidate[4], Sighting)
     }
         for candidate in candidates]
@@ -61,6 +61,7 @@ def recognize():
     while i < len(converted_list):
         sighting = converted_list[i]["sighting"]
         if sighting.individual_id is None:
+            converted_list.pop(i)
             continue
         # filter out all but the first candidate of every individual_id
         # also, remove candidates that have no individual_id
@@ -70,7 +71,6 @@ def recognize():
                 converted_list.pop(j)
             else:
                 j += 1
-                i -= 1
 
         converted_list[i]["individual"] = get_dataclass(converted_list[i]["sighting"].individual_id, Individual)
         i += 1
