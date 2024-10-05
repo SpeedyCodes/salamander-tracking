@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
         coords_database = get_individuals_coords()
 
-        list_coordinates = image_to_canonical_representation(unknown_image)
+        list_coordinates, _ = image_to_canonical_representation(unknown_image)
         list_of_scores = compare_dot_patterns(list_coordinates, coords_database)
 
         # Convert the database in a dictionary for easy acces.
