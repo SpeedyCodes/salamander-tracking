@@ -107,8 +107,8 @@ def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
     print(f"Time for matching procedure: {time() - start_time} seconds ---")
 
     # Sort the list_of_scores based on highest combined score.
-    weight_S1 = 0.3
-    weight_S2 = 0.7
+    weight_S1 = 0.4
+    weight_S2 = 0.6
     list_of_scores = sort_list_of_scores(list_of_scores, weight_S1, weight_S2)
 
     return list_of_scores
@@ -648,9 +648,9 @@ def compute_score(V: int, f_t: float, V_max: int, S2: float):
     S2 = S2 * 100  # Converting to percent.
     if S2 <= 10:
         keyword = 'No'
-    elif 10 < S2 <= 40:
+    elif 10 < S2 < 40:
         keyword = 'Weak'
-    elif 40 < S2 <= 70:
+    elif 40 <= S2 < 70:
         keyword = 'Medium'
     else:
         keyword = 'Strong'
@@ -690,7 +690,8 @@ def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
 
 
 def display_results(image: np.ndarray, database: dict[str, np.ndarray],
-                    list_of_scores: list[tuple[int, float, float, str, str]]):
+                    list_of_scores: list[tuple[int, float, float, str, str]],
+                    weight_S1=0.4, weight_S2=0.6):
     """ This method will display the three best matches to the user.
 
     INPUT: list_of_scores is of the form [ (S1, S1_rel, S2, keyword, name), ... ]. """
@@ -707,6 +708,11 @@ def display_results(image: np.ndarray, database: dict[str, np.ndarray],
     axes[0].axis('off')
 
     for i, (S1, S1_rel, S2, keyword, name) in enumerate(top_matches):
+
+        # Only display the salamanders with a combined score of S >= 0.4.
+        if not score_combined(S1_rel, S2, weight_S1, weight_S2) >= 0.4:
+            continue
+
         S2 = "%.2f" % round(S2 * 100, 2)
         S2 = str(S2) + '%'
 
