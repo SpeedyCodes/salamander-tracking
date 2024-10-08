@@ -47,7 +47,7 @@ def recognize():
     image_bytes = request.data
     image_id = store_file(image_bytes)
     image = decode_image(image_bytes)
-    coordinates = image_to_canonical_representation(image)
+    coordinates, quality = image_to_canonical_representation(image)
 
 
     candidates = match_canonical_representation_to_database(coordinates, 4)

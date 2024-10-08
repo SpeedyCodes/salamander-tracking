@@ -136,11 +136,11 @@ class CoordinateTransformer:
         new_point_y = spine_length_needed / full_spine_length
 
         # TODO removeme
-        cv2.circle(image, closest_point, 5, (0, 255, 0), -1)
-        cv2.putText(image, "closest point on spine", closest_point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        cv2.line(image, (x, y), closest_point, (0, 255, 0))
-        cv2.circle(image, (int(new_point_x + self.x_remapped[0]), int(new_point_y + self.y_remapped[0])), 5, (0, 0, 0), -1)
-        cv2.putText(image, "new", (int(new_point_x), int(new_point_y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+        # cv2.circle(image, closest_point, 5, (0, 255, 0), -1)
+        # cv2.putText(image, "closest point on spine", closest_point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        # cv2.line(image, (x, y), closest_point, (0, 255, 0))
+        # cv2.circle(image, (int(new_point_x + self.x_remapped[0]), int(new_point_y + self.y_remapped[0])), 5, (0, 0, 0), -1)
+        # cv2.putText(image, "new", (int(new_point_x), int(new_point_y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
         return new_point_x, new_point_y
 
