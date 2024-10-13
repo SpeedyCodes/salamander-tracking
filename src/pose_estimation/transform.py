@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d, CubicSpline
 from scipy import integrate
 import cv2
+from src.utils import ImageQuality
 
 class CoordinateTransformer:
     """
@@ -23,18 +24,51 @@ class CoordinateTransformer:
         self.x_remapped = np.array([0] * len(self.used_points))
         self.y_remapped = np.array([0] * len(self.used_points))
 
+        missing_points = []
+
         x_given = []
         y_given = []
         for body_part_name in self.used_points:
+            if body_part_name not in datapoints:
+                missing_points.append(body_part_name)
+                continue
             x, y, confidence = datapoints[body_part_name]
+            if confidence < 0.5:
+                missing_points.append(body_part_name)
+                continue
             x_given.append(x)
             y_given.append(y)
+
+        self.image_quality = ImageQuality.GOOD
+
+        if len(missing_points) > 0:
+            self.image_quality = ImageQuality.MEDIUM
+            # if only one point in the middle is missing, we can interpolate it
+            # otherwise, the image is too bad
+            if (len(missing_points) > 1 or self.used_points[0] in missing_points
+                    or self.used_points[-1] in missing_points):
+                self.image_quality = ImageQuality.BAD
+                return  # the image is too bad to interpolate, stop
 
         self.x_given = np.array(x_given)
         self.y_given = np.array(y_given)
 
         self.x_poly = self._get_interpolation_for_axis(self.x_given)
         self.y_poly = self._get_interpolation_for_axis(self.y_given)
+
+        # interpolate missing body parts
+        for body_part_name in missing_points:
+            inter_t = (self.used_points.index(body_part_name)-1+self.used_points.index(body_part_name))/2
+            this_x = self.x_poly(inter_t)
+            this_y = self.y_poly(inter_t)
+            self.x_given = np.insert(self.x_given, self.used_points.index(body_part_name), this_x)
+            self.y_given = np.insert(self.y_given, self.used_points.index(body_part_name), this_y)
+
+        # recompute the interpolation with inserted points
+        if len(missing_points) > 0:
+            self.x_poly = self._get_interpolation_for_axis(self.x_given)
+            self.y_poly = self._get_interpolation_for_axis(self.y_given)
+
         self.x_poly_derivative = self.x_poly.derivative()
         self.y_poly_derivative = self.y_poly.derivative()
         self.arc_length_integrand = lambda t: np.sqrt(self.x_poly_derivative(t) ** 2 + self.y_poly_derivative(t) ** 2)
@@ -106,6 +140,8 @@ class CoordinateTransformer:
         :param y:
         :return:
         """
+
+        assert self.image_quality > ImageQuality.BAD
 
         #  find the closest point in the interpolation
         t = np.linspace(0, len(self.x_given) - 1, 1000)
