@@ -165,6 +165,15 @@ def get_sightings():
 
     return list
 
+@app.after_request
+def after_request(response):
+    # cors stuff to make flutter-web work
+    response.headers['Access-Control-Allow-Origin'] = request.origin
+    response.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type'
+    response.headers['Access-Control-Allow-Methods'] = 'POST, GET'
+    response.headers['Vary'] = 'Origin'
+    return response
+
 
 
 if __name__ == '__main__':
