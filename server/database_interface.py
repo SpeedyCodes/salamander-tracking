@@ -1,15 +1,9 @@
-import gridfs
-from bson import ObjectId
-from pymongo import MongoClient, CursorType
-from dataclasses import asdict, fields
+from sqlalchemy import select, insert
 
-from config import MONGO_CONNECTION_STRING
-client = MongoClient(MONGO_CONNECTION_STRING)
+from models.individual import Individual
+from models.sighting import Sighting
+from server import db
 
-db = client["Salamanders"]
-individuals = db["individuals"]
-sightings = db["sightings"]
-bucket = gridfs.GridFSBucket(db)
 
 def wrap_object_id(dataclass_instance):
     for field in fields(dataclass_instance):
@@ -30,20 +24,14 @@ def unwrap_object_id(dataclass_instance):
     return dataclass_instance
 
 def get_individuals_coords():
-    cursor: CursorType = sightings.find()
+    individuals = db.session.scalars(select(Individual)).all()
     # change the coords to a list of tuples to make it hashable
-    list = [(str(doc["_id"]), [(coords[0], coords[1]) for coords in doc["coordinates"]]) for doc in cursor]
-    return list
+    return [(str(individual["_id"]), [(coords[0], coords[1]) for coords in individual["coordinates"]]) for individual in individuals]
 
-def get_individual_coords(name):
-    doc = individuals.find_one({"name": name})
-    return [(coords[0], coords[1]) for coords in doc["coordinates"]]
-def store_dataclass(dataclass):
-    dataclass = wrap_object_id(dataclass)
-    dict = asdict(dataclass)
-    dict.pop("_id")
-    result = db[dataclass.collection_name].insert_one(dict)
-    return str(result.inserted_id)
+def store_dataclass(object):
+    db.session.add(object)
+    db.session.commit()
+    return object
 
 def get_dataclass(value, dataclass, field="_id"):
     if "_id" in field:

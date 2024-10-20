@@ -6,27 +6,15 @@ from server.database_interface import *
 from dataclasses import dataclass, InitVar, asdict
 from typing import List, Tuple, Set, Optional
 from datetime import datetime
+from server import db
+from config import PG_CONNECTION_STRING
+
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = PG_CONNECTION_STRING
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-
-@dataclass
-class Individual:
-    name: str
-    sighting_ids: List[str]
-    _id: Optional[str] = None
-    coordinates: Optional[List[tuple[float, float]]] = None
-    collection_name: InitVar[str] = "individuals"
-
-
-@dataclass
-class Sighting:
-    individual_id: Optional[str]
-    image_id: str
-    _id: Optional[str] = None
-    coordinates: Optional[List[tuple[float, float]]] = None
-    date: Optional[datetime] = None
-    collection_name: InitVar[str] = "sightings"
+db.init_app(app)
 
 
 def encode_image(image: np.ndarray):
