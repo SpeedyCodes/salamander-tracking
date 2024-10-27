@@ -1,7 +1,7 @@
 from sqlalchemy import select, insert
 
-from models.individual import Individual
-from models.sighting import Sighting
+from server.models.individual import Individual
+from server.models.sighting import Sighting
 from server import db
 
 
@@ -33,27 +33,11 @@ def store_dataclass(object):
     db.session.commit()
     return object
 
-def get_dataclass(value, dataclass, field="_id"):
-    if "_id" in field:
-        value = ObjectId(value)
-    doc = db[dataclass.collection_name].find_one({field: value})
-    return unwrap_object_id(dataclass(**doc))
+def get_sighting(sighting_id: int) -> Sighting:
+    return db.session.get(Sighting, sighting_id)
 
-def set_field(_id, field, value, dataclass):
-    if "_id" in field:
-        value = ObjectId(value)
-    db[dataclass.collection_name].update_one({"_id": ObjectId(_id)}, {"$set": {field: value}})
+def get_individual(individual_id: int) -> Individual:
+    return db.session.get(Individual, individual_id)
 
-def get_all(dataclass):
-    cursor: CursorType = db[dataclass.collection_name].find()
-    list = [unwrap_object_id(dataclass(**doc)) for doc in cursor]
-    return list
-
-def store_file(file):
-    _id = bucket.upload_from_stream("salamander_image", file)
-    return str(_id)
-
-def get_file(_id):
-    file = bucket.open_download_stream(ObjectId(_id))
-    return file.read()
-
+def get_individuals():
+    return db.session.query(Individual).all()

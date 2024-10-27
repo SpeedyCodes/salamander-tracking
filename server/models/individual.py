@@ -8,4 +8,4 @@ class Individual(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[String] = mapped_column(String(100))
-    sighting_ids: Mapped[ARRAY[int]] = mapped_column(ARRAY(String))
+    sighting_ids: Mapped[list[int]] = mapped_column(ARRAY(String))

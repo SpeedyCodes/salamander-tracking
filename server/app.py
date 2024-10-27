@@ -33,7 +33,6 @@ def recognize():
     The submitted image is saved as a sighting to be confirmed later.
     """
     image_bytes = request.data
-    image_id = store_file(image_bytes)
     image = decode_image(image_bytes)
     coordinates, quality = image_to_canonical_representation(image)
 
@@ -42,7 +41,7 @@ def recognize():
 
     converted_list = [{
         "confidence": candidate[2],
-        "sighting": get_dataclass(candidate[4], Sighting)
+        "sighting": get_sighting(int(candidate[4]))
     }
         for candidate in candidates]
     i = 0
@@ -60,14 +59,14 @@ def recognize():
             else:
                 j += 1
 
-        converted_list[i]["individual"] = get_dataclass(converted_list[i]["sighting"].individual_id, Individual)
+        converted_list[i]["individual"] = get_individual(converted_list[i]["sighting"].individual_id)
         i += 1
 
 
-    sighting = Sighting(individual_id=None, image_id=image_id, coordinates=list(coordinates))
-    sighting_id = store_dataclass(sighting)
+    sighting = Sighting(individual_id=None, image=image_bytes, coordinates=list(coordinates))
+    sighting = store_dataclass(sighting)
     return {
-        "sighting_id": sighting_id,
+        "sighting_id": sighting.id,
         "candidates": converted_list
     }
 
@@ -81,10 +80,11 @@ def confirm(sighting_id):
     individual_id = request.args.get('individual_id')
     body = request.json
     if not individual_id:  # if the individual is new
-        sighting: Sighting = get_dataclass(sighting_id, Sighting)
-        individual = Individual(name=body["nickname"], coordinates=sighting.coordinates, sighting_ids=[sighting._id])
+        sighting = get_sighting(sighting_id)
+        individual = Individual(name=body["nickname"], sighting_ids=[sighting.id])
         individual_id = store_dataclass(individual)
     else:  # if the individual is already in the database
+
         db["individuals"].update_one({"_id": ObjectId(individual_id)},
                                      {"$push": {"sighting_ids": ObjectId(sighting_id)}})
     set_field(sighting_id, "individual_id", individual_id, Sighting)
@@ -98,8 +98,8 @@ def info(id):
     Returns the information of the salamander with the given id.
     """
 
-    individual = get_dataclass(id, Individual)
-    return asdict(individual)
+    individual = get_individual(id)
+    return individual
 
 
 @app.route('/individuals', methods=['GET'])
@@ -108,7 +108,7 @@ def all_individuals():
     Returns the information of all the salamanders in the database.
     """
 
-    individuals = get_all(Individual)
+    individuals = get_individuals()
     return [asdict(individual) for individual in individuals]
 
 
@@ -132,7 +132,7 @@ def sighting_image(id):
     Returns the image of the sighting with the given id.
     """
 
-    sighting: Sighting = get_dataclass(id, Sighting)
+    sighting: Sighting = get_sighting(id)
     image = get_file(sighting.image_id)
     return Response(image, mimetype='image/png')
 
@@ -142,14 +142,14 @@ def get_sightings():
     Returns the information of all the sightings in the database.
     """
 
-    sightings = get_all(Sighting)
+    sightings = get_individuals()
     list = [asdict(sighting) for sighting in sightings if sighting.individual_id is not None]
 
     if "individual_id" in request.args:
         list = [sighting for sighting in list if sighting["individual_id"] == request.args["individual_id"]]
     for sighting in list:
         sighting.pop("coordinates")
-        sighting["individual_name"] = get_dataclass(sighting["individual_id"], Individual).name
+        sighting["individual_name"] = get_individual(sighting["individual_id"]).name
 
     return list
 
