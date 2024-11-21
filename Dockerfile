@@ -2,8 +2,8 @@ FROM python:3.11
 LABEL authors="Jesse Daems & Rune De Coninck"
 
 COPY requirements.txt requirements.txt
-RUN pip3 install --upgrade pip && pip install -r requirements.txt
-RUN pip install gunicorn
+RUN pip3 install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gunicorn
 RUN apt update
 RUN apt install libopencv-dev -y
 RUN python -c "import largestinteriorrectangle"

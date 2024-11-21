@@ -5,6 +5,7 @@ pillow-heif
 flask
 tqdm
 largestinteriorrectangle
+tensorflow==2.12.0
 deeplabcut[tf]
 keras==2.12.0
 typing-extensions>=4.6

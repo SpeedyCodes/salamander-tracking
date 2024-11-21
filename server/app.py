@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, render_template
 import cv2
 import numpy as np
 from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
@@ -7,7 +7,7 @@ from dataclasses import dataclass, InitVar, asdict
 from typing import List, Tuple, Set, Optional
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 
 @dataclass
@@ -174,7 +174,9 @@ def after_request(response):
     response.headers['Vary'] = 'Origin'
     return response
 
-
+@app.route("/")
+def index():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
