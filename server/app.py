@@ -1,6 +1,8 @@
 from flask import Flask, request, Response, render_template
 import cv2
 import numpy as np
+
+from server.models.image_pipeline import ImagePipeline
 from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
 from server.database_interface import *
 from dataclasses import dataclass, InitVar, asdict
@@ -62,8 +64,9 @@ def recognize():
         converted_list[i]["individual"] = get_individual(converted_list[i]["sighting"].individual_id)
         i += 1
 
-
-    sighting = Sighting(individual_id=None, image=image_bytes, coordinates=list(coordinates))
+    images = ImagePipeline(original_image=image_bytes)
+    store_dataclass(images)
+    sighting = Sighting(individual_id=None, image_id=images.id, coordinates=list(coordinates))
     sighting = store_dataclass(sighting)
     return {
         "sighting_id": sighting.id,
@@ -77,18 +80,19 @@ def confirm(sighting_id):
     Confirms the identity of the sighting with the given sighting_id,
     or creates a new individual if the salamander is not in the database.
     """
-    individual_id = request.args.get('individual_id')
+    individual_id = int(request.args.get('individual_id'))
     body = request.json
+    sighting = get_sighting(sighting_id)
     if not individual_id:  # if the individual is new
-        sighting = get_sighting(sighting_id)
         individual = Individual(name=body["nickname"], sighting_ids=[sighting.id])
         individual_id = store_dataclass(individual)
     else:  # if the individual is already in the database
+        individual = get_individual(individual_id)
+        individual.sighting_ids.append(sighting.id)
 
-        db["individuals"].update_one({"_id": ObjectId(individual_id)},
-                                     {"$push": {"sighting_ids": ObjectId(sighting_id)}})
-    set_field(sighting_id, "individual_id", individual_id, Sighting)
-    set_field(sighting_id, "date", body["spotted_at"], Sighting)
+    sighting.individual_id = individual_id
+    sighting.date = body["spotted_at"]
+    db.commit()
     return Response(status=200)
 
 
@@ -98,8 +102,7 @@ def info(id):
     Returns the information of the salamander with the given id.
     """
 
-    individual = get_individual(id)
-    return individual
+    return get_individual(id)
 
 
 @app.route('/individuals', methods=['GET'])
@@ -108,8 +111,7 @@ def all_individuals():
     Returns the information of all the salamanders in the database.
     """
 
-    individuals = get_individuals()
-    return [asdict(individual) for individual in individuals]
+    return get_individuals()
 
 
 @app.route('/individuals/<string:id>/image', methods=['GET'])
@@ -117,12 +119,9 @@ def individual_image(id):
     """
     Returns an image of the salamander with the given id.
     """
-
-    # get one of the sightings where the individual_id is the given id
-    cursor: CursorType = sightings.find({"individual_id": ObjectId(id)})
-    list = [Sighting(**doc) for doc in cursor]
-    sighting: Sighting = list[0]
-    image = get_file(sighting.image_id)
+    individual = db.session.get(Individual, id)
+    sighting = db.session.get(Sighting, individual.sighting_ids[0])
+    image = db.session.get(ImagePipeline, sighting.image_id).original_image
     return Response(image, mimetype='image/png')
 
 
@@ -133,7 +132,7 @@ def sighting_image(id):
     """
 
     sighting: Sighting = get_sighting(id)
-    image = get_file(sighting.image_id)
+    image = db.session.get(ImagePipeline, sighting.image_id).original_image
     return Response(image, mimetype='image/png')
 
 @app.route('/sightings', methods=['GET'])
@@ -142,16 +141,12 @@ def get_sightings():
     Returns the information of all the sightings in the database.
     """
 
-    sightings = get_individuals()
-    list = [asdict(sighting) for sighting in sightings if sighting.individual_id is not None]
+    query = db.session.query(Sighting).filter(Sighting.individual_id is not None)
 
     if "individual_id" in request.args:
-        list = [sighting for sighting in list if sighting["individual_id"] == request.args["individual_id"]]
-    for sighting in list:
-        sighting.pop("coordinates")
-        sighting["individual_name"] = get_individual(sighting["individual_id"]).name
+        query = query.filter(Sighting.individual_id == request.args["individual_id"])
 
-    return list
+    return query.all()
 
 @app.after_request
 def after_request(response):

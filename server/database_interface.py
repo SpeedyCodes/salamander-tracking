@@ -5,24 +5,6 @@ from server.models.sighting import Sighting
 from server import db
 
 
-def wrap_object_id(dataclass_instance):
-    for field in fields(dataclass_instance):
-        if "_id" in field.name:
-            if hasattr(field.type, "_name") and field.type._name == "List":
-                setattr(dataclass_instance, field.name, [ObjectId(id) for id in getattr(dataclass_instance, field.name)])
-            elif getattr(dataclass_instance, field.name) is not None:
-                setattr(dataclass_instance, field.name, ObjectId(getattr(dataclass_instance, field.name)))
-    return dataclass_instance
-
-def unwrap_object_id(dataclass_instance):
-    for field in fields(dataclass_instance):
-        if "_id" in field.name:
-            if hasattr(field.type, "_name") and field.type._name == "List":
-                setattr(dataclass_instance, field.name, [str(id) for id in getattr(dataclass_instance, field.name)])
-            elif getattr(dataclass_instance, field.name) is not None:
-                setattr(dataclass_instance, field.name, str(getattr(dataclass_instance, field.name)))
-    return dataclass_instance
-
 def get_individuals_coords():
     individuals = db.session.scalars(select(Individual)).all()
     # change the coords to a list of tuples to make it hashable

@@ -7,6 +7,7 @@ Flask-SQLAlchemy
 psycopg2-binary
 tqdm
 largestinteriorrectangle
+tensorflow==2.12.0
 deeplabcut[tf]
 keras==2.12.0
 typing-extensions>=4.6
