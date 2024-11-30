@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 
 from server.models.image_pipeline import ImagePipeline
+from server.models import Base
 from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
 from server.database_interface import *
 from dataclasses import dataclass, InitVar, asdict
@@ -10,6 +11,7 @@ from typing import List, Tuple, Set, Optional
 from datetime import datetime
 from server import db
 from config import PG_CONNECTION_STRING
+from flask_migrate import Migrate
 
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -17,6 +19,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = PG_CONNECTION_STRING
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
+migrate = Migrate(app, db)
 
 
 def encode_image(image: np.ndarray):
@@ -80,19 +83,18 @@ def confirm(sighting_id):
     Confirms the identity of the sighting with the given sighting_id,
     or creates a new individual if the salamander is not in the database.
     """
-    individual_id = int(request.args.get('individual_id'))
+    individual_id = request.args.get('individual_id', type=int)
     body = request.json
     sighting = get_sighting(sighting_id)
     if not individual_id:  # if the individual is new
-        individual = Individual(name=body["nickname"], sighting_ids=[sighting.id])
-        individual_id = store_dataclass(individual)
-    else:  # if the individual is already in the database
-        individual = get_individual(individual_id)
-        individual.sighting_ids.append(sighting.id)
+        individual = Individual(name=body["nickname"])
+        individual = store_dataclass(individual)
+    else:
+        individual = db.session.get(Individual, individual_id)
 
-    sighting.individual_id = individual_id
-    sighting.date = body["spotted_at"]
-    db.commit()
+    sighting.individual_id = individual.id
+    sighting.date = datetime.strptime(body["spotted_at"], "%Y-%m-%dT%H:%M:%S.%f")
+    db.session.commit()
     return Response(status=200)
 
 
@@ -120,7 +122,7 @@ def individual_image(id):
     Returns an image of the salamander with the given id.
     """
     individual = db.session.get(Individual, id)
-    sighting = db.session.get(Sighting, individual.sighting_ids[0])
+    sighting = db.session.query(Sighting).filter(Sighting.individual_id == individual.id).first()
     image = db.session.get(ImagePipeline, sighting.image_id).original_image
     return Response(image, mimetype='image/png')
 
