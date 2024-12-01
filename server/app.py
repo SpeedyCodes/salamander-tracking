@@ -1,9 +1,10 @@
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template, jsonify
 import cv2
 import numpy as np
 
 from server.models.image_pipeline import ImagePipeline
 from server.models import Base
+from server.models.named_location import NamedLocation
 from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
 from server.database_interface import *
 from dataclasses import dataclass, InitVar, asdict
@@ -84,6 +85,7 @@ def confirm(sighting_id):
     or creates a new individual if the salamander is not in the database.
     """
     individual_id = request.args.get('individual_id', type=int)
+    location_id = request.args.get('location_id', type=int)
     body = request.json
     sighting = get_sighting(sighting_id)
     if not individual_id:  # if the individual is new
@@ -92,6 +94,8 @@ def confirm(sighting_id):
     else:
         individual = db.session.get(Individual, individual_id)
 
+    if location_id:
+        sighting.location_id = location_id
     sighting.individual_id = individual.id
     sighting.date = datetime.strptime(body["spotted_at"], "%Y-%m-%dT%H:%M:%S.%f")
     db.session.commit()
@@ -104,7 +108,7 @@ def info(id):
     Returns the information of the salamander with the given id.
     """
 
-    return get_individual(id)
+    return jsonify(get_individual(id))
 
 
 @app.route('/individuals', methods=['GET'])
@@ -143,12 +147,29 @@ def get_sightings():
     Returns the information of all the sightings in the database.
     """
 
-    query = db.session.query(Sighting).filter(Sighting.individual_id is not None)
+    query = db.session.query(Sighting).filter(Sighting.individual_id != None)
 
     if "individual_id" in request.args:
         query = query.filter(Sighting.individual_id == request.args["individual_id"])
 
     return query.all()
+
+@app.route('/locations', methods=['POST'])
+def add_location():
+    """
+    Adds a location to the database.
+    """
+    body = request.json
+    location = NamedLocation(name=body["name"], precise_location=body["precise_location"])
+    location = store_dataclass(location)
+    return asdict(location)
+
+@app.route('/locations', methods=['GET'])
+def get_locations():
+    """
+    Returns all the locations in the database.
+    """
+    return db.session.query(NamedLocation).all()
 
 @app.after_request
 def after_request(response):

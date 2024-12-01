@@ -8,7 +8,7 @@ def get_individuals_coords():
     sightings = db.session.scalars(select(Sighting)).all()
 
     # change the coords to a list of tuples to make it hashable
-    return [(str(sighting.individual_id), [(coords[0], coords[1]) for coords in sighting.coordinates]) for sighting in sightings]
+    return [(str(sighting.id), [(coords[0], coords[1]) for coords in sighting.coordinates]) for sighting in sightings]
 
 def store_dataclass(object):
     db.session.add(object)
