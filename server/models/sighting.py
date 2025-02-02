@@ -16,7 +16,7 @@ class Sighting(Base):
     individual: Mapped["Individual"] = relationship(init=False)
     coordinates: Mapped[list[Tuple[float, float]]] = mapped_column(ARRAY(Float))
     date: Mapped[Optional[DateTime]] = mapped_column(DateTime, nullable=True, init=False)
-    image_id: Mapped[Optional[int]] = mapped_column(ForeignKey('image_pipelines.id'), nullable=True)
+    image_id: Mapped[Optional[int]] = mapped_column(ForeignKey('image_pipelines.id'), nullable=True) # TODO cascade delete
     location_id: Mapped[Optional[int]] = mapped_column(ForeignKey('named_locations.id'), nullable=True, init=False)
     location: Mapped["NamedLocation"] = relationship(init=False)
     precise_location: Mapped[Optional[Tuple[float, float]]] = mapped_column(ARRAY(Float), nullable=True, init=False)

@@ -1,5 +1,7 @@
 import numpy as np
-from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer
+
+from src.dot_detection.dot_detect_haar import draw_dots
+from src.pose_estimation import estimate_pose_from_image, CoordinateTransformer, draw_pose
 from src.dot_detection import dot_detect_haar
 from src.preprocessing import isolate_salamander
 from src.preprocessing.coordinates import calculate_centroid_of_rectangle, normalisation_of_coordinates
@@ -20,6 +22,10 @@ class CoordinateExtractor:
         self.coordinates_pose = None
         self.pose_estimation_success = None
         self.image = image
+        self.pose_estimation_image = None
+        self.cropped_image = None
+        self.dot_detection_image = None
+        self.straightened_dots_image = None
 
     def crop_image_to_belly(self) -> tuple[np.ndarray, ImageQuality]:
         """
@@ -36,6 +42,7 @@ class CoordinateExtractor:
         image_quality: ImageQuality = ImageQuality.GOOD
 
         self.coordinates_pose, self.pose_estimation_success = estimate_pose_from_image(self.image)
+        self.pose_estimation_image = draw_pose(self.image, self.coordinates_pose)
 
         if not self.pose_estimation_success:
             # Try to crop the image such that it is smaller.
@@ -55,6 +62,7 @@ class CoordinateExtractor:
         if pose_estimation_evaluation == 2 and is_background_removed:
             # Try pose estimation again on smaller image.
             self.coordinates_pose, self.pose_estimation_success = estimate_pose_from_image(no_background)
+            self.pose_estimation_image = draw_pose(self.image, self.coordinates_pose)
 
             if not self.pose_estimation_success:
                 pose_estimation_evaluation = 0
@@ -90,8 +98,10 @@ class CoordinateExtractor:
         """
         :return: The canonical representation of the coordinates of the dots on the salamander's skin in the image.
         """
-        isolate_image, image_quality = self.crop_image_to_belly()
-        list_haar_cascade = dot_detect_haar(isolate_image)
+        self.cropped_image, image_quality = self.crop_image_to_belly()
+        list_haar_cascade = dot_detect_haar(self.cropped_image)
+
+        self.dot_detection_image = draw_dots(self.cropped_image, list_haar_cascade)
 
         if len(list_haar_cascade) < 3:
             # There are either no dots detected, which is very bad. Or there are too little dots detected to generate
@@ -109,14 +119,15 @@ class CoordinateExtractor:
                 return set(), coordinate_transformer.image_quality
             image_quality = min(image_quality, coordinate_transformer.image_quality)
             normalised = set([coordinate_transformer.transform(*coordinate) for coordinate in list_coordinates])
+            self.straightened_dots_image = coordinate_transformer.show_transformation(self.image)
         else:  # TODO check if the normalisation outside transform() doesn't need to happen even if pose estimation succeeds
-            normalised = [normalisation_of_coordinates(*coordinate, isolate_image.shape[1], isolate_image.shape[0]) for
+            normalised = [normalisation_of_coordinates(*coordinate, self.cropped_image.shape[1], self.cropped_image.shape[0]) for
                           coordinate in list_coordinates]
 
         return normalised, image_quality
 
 
-def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[float, float]], ImageQuality]:
+def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[float, float]], ImageQuality, list[np.ndarray]]:
     """
     Takes in an image and returns the canonical (normalized) representation of the coordinates.
     :param:  image
@@ -124,8 +135,8 @@ def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[floa
     :return: The quality of the image, this is either 'Good', 'Medium', or 'Bad'.
     """
     coordinate_extractor = CoordinateExtractor(image)
-
-    return coordinate_extractor.extract()
+    coords, quality = coordinate_extractor.extract()
+    return coords, quality, [coordinate_extractor.pose_estimation_image, coordinate_extractor.cropped_image, coordinate_extractor.dot_detection_image, coordinate_extractor.straightened_dots_image]
 
 
 def match_canonical_representation_to_database(canonical_representation: set[tuple[float, float]],

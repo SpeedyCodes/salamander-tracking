@@ -41,6 +41,7 @@ def recognize():
     image_bytes = request.data
     image = decode_image(image_bytes)
     coordinates, quality = image_to_canonical_representation(image)
+    coordinates, quality, intermediates = image_to_canonical_representation(image)
 
 
     candidates = match_canonical_representation_to_database(coordinates, 4)
@@ -68,7 +69,7 @@ def recognize():
         converted_list[i]["individual"] = get_individual(converted_list[i]["sighting"].individual_id)
         i += 1
 
-    images = ImagePipeline(original_image=image_bytes)
+    images = ImagePipeline(original_image=image_bytes, pose_estimation_image=encode_image(intermediates[0]), cropped_image=encode_image(intermediates[1]), dot_detection_image=encode_image(intermediates[2]), straightened_dots_image=encode_image(intermediates[3]))
     store_dataclass(images)
     sighting = Sighting(individual_id=None, image_id=images.id, coordinates=list(coordinates))
     sighting = store_dataclass(sighting)
@@ -141,6 +142,27 @@ def sighting_image(id):
     image = db.session.get(ImagePipeline, sighting.image_id).original_image
     return Response(image, mimetype='image/png')
 
+@app.route('/sightings/<string:id>/image/<string:intermediate_image_name>', methods=['GET'])
+def intermediate_image(id, intermediate_image_name):
+    """
+    Returns the intermediate image of the sighting with the given id.
+    """
+
+    sighting: Sighting = get_sighting(id)
+    pipeline = db.session.get(ImagePipeline, sighting.image_id)
+    match intermediate_image_name:
+        case "pose_estimation":
+            image = pipeline.pose_estimation_image
+        case "cropped":
+            image = pipeline.cropped_image
+        case "dot_detection":
+            image = pipeline.dot_detection_image
+        case "straightened_dots":
+            image = pipeline.straightened_dots_image
+        case _:
+            return Response(status=404)
+    return Response(image, mimetype='image/png')
+
 @app.route('/sightings', methods=['GET'])
 def get_sightings():
     """
@@ -153,6 +175,17 @@ def get_sightings():
         query = query.filter(Sighting.individual_id == request.args["individual_id"])
 
     return query.all()
+
+@app.route('/sightings/<string:id>', methods=['DELETE'])
+def delete_sighting(id):
+    """
+    Deletes the sighting with the given id.
+    """
+
+    sighting = get_sighting(id)
+    db.session.delete(sighting)
+    db.session.commit()
+    return Response(status=200)
 
 @app.route('/locations', methods=['POST'])
 def add_location():
@@ -176,7 +209,7 @@ def after_request(response):
     # cors stuff to make flutter-web work
     response.headers['Access-Control-Allow-Origin'] = request.origin
     response.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type'
-    response.headers['Access-Control-Allow-Methods'] = 'POST, GET'
+    response.headers['Access-Control-Allow-Methods'] = 'POST, GET, DELETE'
     response.headers['Vary'] = 'Origin'
     return response
 
