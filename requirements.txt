@@ -16,3 +16,5 @@ scipy
 huey
 redis
 flask-migrate
+bcrypt
+pyjwt

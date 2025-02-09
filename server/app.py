@@ -5,14 +5,17 @@ import numpy as np
 from server.models.image_pipeline import ImagePipeline
 from server.models import Base
 from server.models.named_location import NamedLocation
+from server.models.password import Password
 from src.facade import image_to_canonical_representation, match_canonical_representation_to_database
 from server.database_interface import *
 from dataclasses import dataclass, InitVar, asdict
 from typing import List, Tuple, Set, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from server import db
-from config import PG_CONNECTION_STRING
+from config import PG_CONNECTION_STRING, jwt_secret
 from flask_migrate import Migrate
+import bcrypt
+import jwt
 
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -204,11 +207,36 @@ def get_locations():
     """
     return db.session.query(NamedLocation).all()
 
+@app.route('/auth', methods=['POST'])
+def auth():
+    password = request.json["password"]
+    hashed_passwords = db.session.query(Password).all()
+    if not any(bcrypt.checkpw(password.encode('utf-8'), hashed_password.password.encode('utf-8')) for hashed_password in hashed_passwords):
+        return Response(status=401)
+
+    exp = datetime.utcnow() + timedelta(days=1)
+
+    return jwt.encode({'exp': exp}, jwt_secret, algorithm='HS256')
+@app.before_request
+def check_auth():
+    if (request.method not in ['GET', 'OPTIONS']) and request.path != '/auth':
+        header = request.headers.get('Authorization')
+        if header is None:
+            return Response(status=401)
+        header = header.replace('Bearer ', '')
+        try:
+            jwt.decode(header, jwt_secret, algorithms=['HS256'])
+            print("success")
+        except jwt.ExpiredSignatureError:
+            return Response(status=401)
+        except jwt.InvalidTokenError:
+            return Response(status=401)
+
 @app.after_request
 def after_request(response):
     # cors stuff to make flutter-web work
     response.headers['Access-Control-Allow-Origin'] = request.origin
-    response.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type'
+    response.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type, Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'POST, GET, DELETE'
     response.headers['Vary'] = 'Origin'
     return response
