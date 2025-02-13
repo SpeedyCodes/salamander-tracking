@@ -86,11 +86,11 @@ class CoordinateExtractor:
                     pose_estimation_evaluation = None  # To break out the while loop.
                     image_quality = ImageQuality.BAD
             else:
-                pose_estimation_evaluation = None  # To break out the while loop.
                 if pose_estimation_evaluation == 2:
                     image_quality = ImageQuality.GOOD
                 else:
                     image_quality = ImageQuality.MEDIUM
+                break
 
         return isolate_image, image_quality
 
@@ -140,13 +140,15 @@ def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[floa
 
 
 def match_canonical_representation_to_database(canonical_representation: set[tuple[float, float]],
-                                               candidates_number) -> str | None:
+                                               candidates_number: int, location_id: int | None) -> str | None:
     """
     Matches the canonical representation of the image to an entry in the database
-    :param canonical_representation:
+    :param canonical_representation: The canonical representation of the image
+    :param candidates_number: The number of candidates to return
+    :param location_id: The location of the salamander
     :return: The name of the salamander in the database
     """
-    database = get_individuals_coords()
+    database = get_individuals_coords(location_id)
     scores = compare_dot_patterns(canonical_representation, database)
     actual_candidates_number = min(candidates_number, len(scores))
     return scores[:actual_candidates_number]

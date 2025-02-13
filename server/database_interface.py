@@ -4,9 +4,11 @@ from server.models.sighting import Sighting
 from server import db
 
 
-def get_individuals_coords():
-    sightings = db.session.scalars(select(Sighting)).all()
-
+def get_individuals_coords(location_id: int | None = None):
+    query = db.session.query(Sighting)
+    if location_id is not None:
+        query = query.filter(Sighting.location_id == location_id)
+    sightings = query.all()
     # change the coords to a list of tuples to make it hashable
     return [(str(sighting.id), [(coords[0], coords[1]) for coords in sighting.coordinates]) for sighting in sightings]
 

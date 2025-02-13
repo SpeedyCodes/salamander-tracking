@@ -17,6 +17,7 @@ from flask_migrate import Migrate
 import bcrypt
 import jwt
 
+from src.utils import ImageQuality
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.config['SQLALCHEMY_DATABASE_URI'] = PG_CONNECTION_STRING
@@ -41,6 +42,8 @@ def recognize():
     Performs recognition and returns candidates with their confidence levels.
     The submitted image is saved as a sighting to be confirmed later.
     """
+
+    location_id = request.args.get('location_id', type=int)
     image_bytes = request.data
     image = decode_image(image_bytes)
     coordinates, quality = image_to_canonical_representation(image)
@@ -49,7 +52,7 @@ def recognize():
         return Response(status=400)
 
 
-    candidates = match_canonical_representation_to_database(coordinates, 4)
+    candidates = match_canonical_representation_to_database(coordinates, 4, location_id)
 
     converted_list = [{
         "confidence": candidate[2],
