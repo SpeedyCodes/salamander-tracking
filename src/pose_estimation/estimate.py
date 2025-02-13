@@ -46,7 +46,10 @@ def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, in
     try:
         result = task(blocking=True, timeout=pose_estimation_timeout)
     except Exception as e:
-        cleanup_dir(image_dir)
+        try:
+            cleanup_dir(image_dir)
+        except Exception:
+            pass
         return {}, False
 
     # read the CSV file that DLC generated
@@ -66,3 +69,13 @@ def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, in
         body_parts[body_part_name] = (int(float(x)), int(float(y)), float(confidence))
 
     return body_parts, True
+
+def draw_pose(image, pose):
+    new_image = image.copy()
+    for body_part_name, (x, y, confidence) in pose.items():
+        if confidence < 0.6:
+            continue
+        cv2.circle(new_image, (x, y), 5, (0, 0, 255), -1)
+        cv2.putText(new_image, body_part_name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    return new_image

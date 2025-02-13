@@ -1,6 +1,9 @@
-from server.database_interface import db
+from server.app import app
+from server.app import db
 
-db["individuals"].delete_many({})
-db["sightings"].delete_many({})
-db["fs.files"].delete_many({})
-db["fs.chunks"].delete_many({})
+
+
+# drop all tables
+with app.app_context():
+    db.drop_all()
+    db.create_all()

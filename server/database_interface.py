@@ -1,71 +1,36 @@
-import gridfs
-from bson import ObjectId
-from pymongo import MongoClient, CursorType
-from dataclasses import asdict, fields
+from sqlalchemy import select, insert
+from server.models.individual import Individual
+from server.models.sighting import Sighting
+from server import db
 
-from config import MONGO_CONNECTION_STRING
-client = MongoClient(MONGO_CONNECTION_STRING)
-
-db = client["Salamanders"]
-individuals = db["individuals"]
-sightings = db["sightings"]
-bucket = gridfs.GridFSBucket(db)
-
-def wrap_object_id(dataclass_instance):
-    for field in fields(dataclass_instance):
-        if "_id" in field.name:
-            if hasattr(field.type, "_name") and field.type._name == "List":
-                setattr(dataclass_instance, field.name, [ObjectId(id) for id in getattr(dataclass_instance, field.name)])
-            elif getattr(dataclass_instance, field.name) is not None:
-                setattr(dataclass_instance, field.name, ObjectId(getattr(dataclass_instance, field.name)))
-    return dataclass_instance
-
-def unwrap_object_id(dataclass_instance):
-    for field in fields(dataclass_instance):
-        if "_id" in field.name:
-            if hasattr(field.type, "_name") and field.type._name == "List":
-                setattr(dataclass_instance, field.name, [str(id) for id in getattr(dataclass_instance, field.name)])
-            elif getattr(dataclass_instance, field.name) is not None:
-                setattr(dataclass_instance, field.name, str(getattr(dataclass_instance, field.name)))
-    return dataclass_instance
 
 def get_individuals_coords():
-    cursor: CursorType = sightings.find()
+    sightings = db.session.scalars(select(Sighting)).all()
+
     # change the coords to a list of tuples to make it hashable
-    list = [(str(doc["_id"]), [(coords[0], coords[1]) for coords in doc["coordinates"]]) for doc in cursor]
-    return list
+    return [(str(sighting.id), [(coords[0], coords[1]) for coords in sighting.coordinates]) for sighting in sightings]
 
-def get_individual_coords(name):
-    doc = individuals.find_one({"name": name})
-    return [(coords[0], coords[1]) for coords in doc["coordinates"]]
-def store_dataclass(dataclass):
-    dataclass = wrap_object_id(dataclass)
-    dict = asdict(dataclass)
-    dict.pop("_id")
-    result = db[dataclass.collection_name].insert_one(dict)
-    return str(result.inserted_id)
+def store_dataclass(object):
+    db.session.add(object)
+    db.session.commit()
+    return object
 
-def get_dataclass(value, dataclass, field="_id"):
-    if "_id" in field:
-        value = ObjectId(value)
-    doc = db[dataclass.collection_name].find_one({field: value})
-    return unwrap_object_id(dataclass(**doc))
+def get_sighting(sighting_id: int) -> Sighting:
+    return db.session.get(Sighting, sighting_id)
 
-def set_field(_id, field, value, dataclass):
-    if "_id" in field:
-        value = ObjectId(value)
-    db[dataclass.collection_name].update_one({"_id": ObjectId(_id)}, {"$set": {field: value}})
+def get_individual(individual_id: int) -> Individual:
+    return db.session.get(Individual, individual_id)
 
-def get_all(dataclass):
-    cursor: CursorType = db[dataclass.collection_name].find()
-    list = [unwrap_object_id(dataclass(**doc)) for doc in cursor]
-    return list
+def get_individuals():
+    return db.session.query(Individual).all()
 
-def store_file(file):
-    _id = bucket.upload_from_stream("salamander_image", file)
-    return str(_id)
+def get_sightings():
+    return db.session.query(Sighting).all()
 
-def get_file(_id):
-    file = bucket.open_download_stream(ObjectId(_id))
-    return file.read()
-
+def confirm_sighting(sighting_id, date, individual_id):
+    individual = db.session.get(Individual, individual_id)
+    if sighting_id not in individual.sighting_ids:
+        individual.sighting_ids.append(sighting_id)
+    sighting = db.session.get(Sighting, sighting_id)
+    sighting.individual_id = individual_id
+    sighting.date = date

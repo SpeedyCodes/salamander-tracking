@@ -26,6 +26,15 @@ def dot_detect_haar(image):
     return output
 
 
+def draw_dots(image, dots):
+    new_image = image.copy()
+    for rectangle in dots:
+        start_point = (rectangle[0], rectangle[1])
+        end_point = (rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
+        cv.rectangle(new_image, start_point, end_point, (255, 0, 0), 2)
+    return new_image
+
+
 if __name__ == '__main__':
     inputs = [wrapped_imread('input/2024/IMG_3023.jpeg'),
               wrapped_imread('input/2024/IMG_3024.jpeg'),

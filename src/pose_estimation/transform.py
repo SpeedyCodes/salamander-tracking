@@ -83,8 +83,8 @@ class CoordinateTransformer:
         #return interp1d(t, x, kind='quadratic')
         return CubicSpline(t, x, bc_type='natural')
 
-    def show_interpolation(self, image):
-
+    def show_transformation(self, base_image):
+        image = base_image.copy()
         t_min = 0
         t_max = len(self.x_given) - 1
 
@@ -106,8 +106,7 @@ class CoordinateTransformer:
         cv2.line(image, (int(self.x_remapped[0]), int(self.y_remapped[0])),
                  (int(self.x_remapped[-1]), int(self.y_remapped[-1])), (255, 0, 0))
 
-        cv2.imshow("image", image)
-        cv2.waitKey(0)
+        return image
 
 
     def _transform_spine(self):
@@ -183,7 +182,7 @@ class CoordinateTransformer:
 
 
 if __name__ == "__main__":
-    image = cv2.imread("src/pose_estimation/testdata/2022-Sal59.jpg")
+    image = cv2.imread("input/2022/2022-Sal59.jpg")
     input = {'head_tip': (175, 34, 0.9991191029548645), 'left_shoulder': (166, 251, 0.9292972087860107), 'left_hand_middle': (77, 347, 0.5459177494049072), 'right_shoulder': (292, 255, 0.9942055344581604), 'right_hand_middle': (455, 347, 0.3259645402431488), 'left_pelvis': (263, 671, 0.9855242371559143), 'left_foot_middle': (154, 845, 0.44996482133865356), 'right_pelvis': (328, 571, 0.9363328814506531), 'right_foot_middle': (386, 463, 0.9253280162811279), 'tail_connection': (350, 714, 0.9914472103118896), 'tail_end': (179, 748, 0.025986261665821075), 'spine_highest': (227, 262, 0.9916161298751831), 'spine_high': (230, 317, 0.7306284308433533), 'spine_middle': (235, 410, 0.7062945365905762), 'spine_low': (249, 513, 0.9910240173339844), 'spine_lowest': (275, 595, 0.897484540939331)}
 
     point = 240, 550
@@ -193,4 +192,7 @@ if __name__ == "__main__":
     transformer = CoordinateTransformer(input)
 
     x, y =transformer.transform(*point)
-    transformer.show_interpolation(image)
+    annotated_image = transformer.show_transformation(image)
+
+    cv2.imshow("image", annotated_image)
+    cv2.waitKey(0)

@@ -11,7 +11,7 @@ legend:
 """
 from src.facade import image_to_canonical_representation
 from src.pattern_matching import compare_dot_patterns, display_results
-from src.dot_detection.dot_detect_haar import dot_detect_haar
+from src.dot_detection.dot_detect_haar import dot_detect_haar, draw_dots
 from src.preprocessing.isolate_salamander import isolate_salamander, crop_image
 from src.utils import wrapped_imread
 from server.database_interface import get_individuals_coords, get_dataclass, get_file
@@ -79,12 +79,9 @@ if __name__ == '__main__':
             image_isolated = isolate_salamander(image, coordinates_pose=pose, pose_estimation_evaluation=2)
             dots = dot_detect_haar(image_isolated)
 
-            for rectangle in dots:
-                start_point = (rectangle[0], rectangle[1])
-                end_point = (rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
-                cv.rectangle(image, start_point, end_point, (255, 0, 0), 2)
+            drawn_image = draw_dots(image, dots)
 
-            cv.imshow('Haar Cascade', image)
+            cv.imshow('Haar Cascade', drawn_image)
             cv.waitKey(0)
         cv.destroyAllWindows()
 
@@ -94,7 +91,7 @@ if __name__ == '__main__':
 
         coords_database = get_individuals_coords()
 
-        list_coordinates, _ = image_to_canonical_representation(unknown_image)
+        list_coordinates, _, _ = image_to_canonical_representation(unknown_image)
         list_of_scores = compare_dot_patterns(list_coordinates, coords_database)
 
         # Convert the database in a dictionary for easy acces.
