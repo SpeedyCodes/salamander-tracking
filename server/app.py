@@ -45,7 +45,7 @@ def recognize():
     image = decode_image(image_bytes)
     coordinates, quality = image_to_canonical_representation(image)
     coordinates, quality, intermediates = image_to_canonical_representation(image)
-    if quality == ImageQuality.BAD or True: # if the image is too bad to process, return a 400 and don't store the image
+    if quality == ImageQuality.BAD: # if the image is too bad to process, return a 400 and don't store the image
         return Response(status=400)
 
 
