@@ -87,7 +87,6 @@ def recognize():
     sighting = store_dataclass(sighting)
     return {
         "sighting_id": sighting.id,
-        "candidates": converted_list
         "candidates": converted_list,
         "quality": quality.name
     }
