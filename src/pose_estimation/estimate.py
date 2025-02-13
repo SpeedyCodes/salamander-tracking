@@ -46,7 +46,10 @@ def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, in
     try:
         result = task(blocking=True, timeout=pose_estimation_timeout)
     except Exception as e:
-        cleanup_dir(image_dir)
+        try:
+            cleanup_dir(image_dir)
+        except Exception:
+            pass
         return {}, False
 
     # read the CSV file that DLC generated

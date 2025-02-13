@@ -45,6 +45,8 @@ def recognize():
     image = decode_image(image_bytes)
     coordinates, quality = image_to_canonical_representation(image)
     coordinates, quality, intermediates = image_to_canonical_representation(image)
+    if quality == ImageQuality.BAD or True: # if the image is too bad to process, return a 400 and don't store the image
+        return Response(status=400)
 
 
     candidates = match_canonical_representation_to_database(coordinates, 4)
@@ -72,13 +74,19 @@ def recognize():
         converted_list[i]["individual"] = get_individual(converted_list[i]["sighting"].individual_id)
         i += 1
 
-    images = ImagePipeline(original_image=image_bytes, pose_estimation_image=encode_image(intermediates[0]), cropped_image=encode_image(intermediates[1]), dot_detection_image=encode_image(intermediates[2]), straightened_dots_image=encode_image(intermediates[3]))
+    pose_estimation_image = encode_image(intermediates[0]) if intermediates[0] is not None else None
+    cropped_image = encode_image(intermediates[1]) if intermediates[1] is not None else None
+    dot_detection_image = encode_image(intermediates[2]) if intermediates[2] is not None else None
+    straightened_dots_image = encode_image(intermediates[3]) if intermediates[3] is not None else None
+    images = ImagePipeline(original_image=image_bytes, pose_estimation_image=pose_estimation_image, cropped_image=cropped_image, dot_detection_image=dot_detection_image, straightened_dots_image=straightened_dots_image)
     store_dataclass(images)
     sighting = Sighting(individual_id=None, image_id=images.id, coordinates=list(coordinates))
     sighting = store_dataclass(sighting)
     return {
         "sighting_id": sighting.id,
         "candidates": converted_list
+        "candidates": converted_list,
+        "quality": quality.name
     }
 
 
