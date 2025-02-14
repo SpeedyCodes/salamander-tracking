@@ -29,7 +29,7 @@ import copy
 from time import time
 import threading
 from typing import List, Tuple, Set
-
+from config import minimum_required_score
 
 def compare_dot_patterns(unknown_image_coordinates: Set[Tuple[float, float]],
                          database_of_coordinates: List[Tuple[str, Set[Tuple[float, float]]]],
@@ -686,7 +686,18 @@ def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
     top_list.sort(key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2), reverse=True)
     bottom_list.sort(key=lambda x: score_combined(x[1], x[2], weight_S1, weight_S2), reverse=True)
 
-    return top_list + bottom_list
+    temp_list = top_list + bottom_list
+    final_list = []
+
+    # Only display the salamanders with a combined score of S >= minimum_required_score (this is evaluated at 0.4
+    # by doing a lot of tests on our data).
+    for (S1, S1_rel, S2, keyword, name) in temp_list:
+        if score_combined(S1_rel, S2, weight_S1, weight_S2) >= minimum_required_score:
+            final_list.append((S1, S1_rel, S2, keyword, name))
+        else:
+            break
+
+    return final_list
 
 
 def display_results(image: np.ndarray, database: dict[str, np.ndarray],
@@ -710,7 +721,7 @@ def display_results(image: np.ndarray, database: dict[str, np.ndarray],
     for i, (S1, S1_rel, S2, keyword, name) in enumerate(top_matches):
 
         # Only display the salamanders with a combined score of S >= 0.4.
-        if not score_combined(S1_rel, S2, weight_S1, weight_S2) >= 0.4:
+        if not score_combined(S1_rel, S2, weight_S1, weight_S2) >= minimum_required_score:
             continue
 
         S2 = "%.2f" % round(S2 * 100, 2)
