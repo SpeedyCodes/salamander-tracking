@@ -693,7 +693,7 @@ def sort_list_of_scores(list_of_scores, weight_S1, weight_S2):
     # by doing a lot of tests on our data).
     for (S1, S1_rel, S2, keyword, name) in temp_list:
         if score_combined(S1_rel, S2, weight_S1, weight_S2) >= minimum_required_score:
-            final_list.append((S1, S1_rel, S2, keyword, name))
+            final_list.append((S1, S1_rel, round(S2, 2), keyword, name))
         else:
             break
 
