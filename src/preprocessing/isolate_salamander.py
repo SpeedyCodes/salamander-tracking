@@ -18,6 +18,8 @@ import largestinteriorrectangle as lir
 from typing import Dict, Tuple
 import math
 from scipy.interpolate import splprep, splev
+from config import pose_estimation_confidence
+import warnings
 
 
 def assert_bgr_format(image):
@@ -604,7 +606,7 @@ def select_useful_coordinates_from_pose_estimation(pose_estimation_dict):
     for name, info in sorted(list(pose_estimation_dict.items()), key=lambda x: x[1][2], reverse=True):
 
         check_close = False
-        if name in useful_names and pose_estimation_dict[name][2] >= 0.70:
+        if name in useful_names and pose_estimation_dict[name][2] >= pose_estimation_confidence:
 
             # If two points are too close together, we remove the point with the lowest confidence.
             for name2 in useful_coordinates:
@@ -614,6 +616,36 @@ def select_useful_coordinates_from_pose_estimation(pose_estimation_dict):
 
             if not check_close:
                 useful_coordinates[name] = pose_estimation_dict[name]
+
+    assert_coordinates_from_pose_estimation(useful_coordinates)
+
+    # Now we will do an additional check to make sure that the pelvis and shoulder are really at the right location.
+    # We want to avoid that for example left_shoulder is located where left_pelvis should be.
+    # We realise this by checking if the distance between for example left_shoulder and spine_highest is less than
+    # the distance between left_shoulder and spine_lowest, as it should be. And these two always exist.
+    if 'left_shoulder' in useful_coordinates.keys():
+        distance1 = math.dist(pose_estimation_dict['left_shoulder'][:2], pose_estimation_dict['spine_highest'][:2])
+        distance2 = math.dist(pose_estimation_dict['left_shoulder'][:2], pose_estimation_dict['spine_lowest'][:2])
+        if distance1 > distance2:
+            del useful_coordinates['left_shoulder']
+
+    if 'right_shoulder' in useful_coordinates.keys():
+        distance1 = math.dist(pose_estimation_dict['right_shoulder'][:2], pose_estimation_dict['spine_highest'][:2])
+        distance2 = math.dist(pose_estimation_dict['right_shoulder'][:2], pose_estimation_dict['spine_lowest'][:2])
+        if distance1 > distance2:
+            del useful_coordinates['right_shoulder']
+
+    if 'left_pelvis' in useful_coordinates.keys():
+        distance1 = math.dist(pose_estimation_dict['left_pelvis'][:2], pose_estimation_dict['spine_highest'][:2])
+        distance2 = math.dist(pose_estimation_dict['left_pelvis'][:2], pose_estimation_dict['spine_lowest'][:2])
+        if distance1 < distance2:
+            del useful_coordinates['left_pelvis']
+
+    if 'right_pelvis' in useful_coordinates.keys():
+        distance1 = math.dist(pose_estimation_dict['right_pelvis'][:2], pose_estimation_dict['spine_highest'][:2])
+        distance2 = math.dist(pose_estimation_dict['right_pelvis'][:2], pose_estimation_dict['spine_lowest'][:2])
+        if distance1 < distance2:
+            del useful_coordinates['right_pelvis']
 
     assert_coordinates_from_pose_estimation(useful_coordinates)
 
@@ -633,11 +665,24 @@ def find_torso(pose_estimation_dict):
     """ This method tries to find the shape of the torso of the salamander via interpolation. This enables us to
     also detect torsos that are curved."""
 
+    # If spine_low, spine_middle and spine_high are not detected, few_spine_detected will be True, and we will need to
+    # change our strategy a little bit.
+    few_spine_detected: bool = False
+
     pose_estimation_dict = select_useful_coordinates_from_pose_estimation(pose_estimation_dict)
 
-    # Compute distance and angles (see our paper for the reason).
-    coords_with_distance = compute_distances_for_torso(pose_estimation_dict)
-    coords_with_angle = compute_angle_for_torso(coords_with_distance, pose_estimation_dict)
+    # Check if we have enough points on the spine or if we need to change our strategy a bit.
+    test_list = []
+    for point in pose_estimation_dict:
+        if point == 'spine_high' or point == 'spine_middle' or point == 'spine_low':
+            test_list.append(point)
+    if len(test_list) == 0:
+        warnings.warn("Warning...........No points on the spine were detected. Results could be suboptimal.")
+        few_spine_detected = True
+
+    # The standard approach. Compute distance and angles (see our paper for the reason).
+    coords_with_distance = compute_distances_for_torso(pose_estimation_dict, few_spine_detected)
+    coords_with_angle = compute_angle_for_torso(coords_with_distance, pose_estimation_dict, few_spine_detected)
 
     points = find_coordinates_on_torso(coords_with_distance, coords_with_angle, pose_estimation_dict)
 
@@ -673,7 +718,7 @@ def calculate_angle_for_torso(rico1: float, rico2: float):
     return angle
 
 
-def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float | int]]:
+def compute_distances_for_torso(pose_estimation_dict, few_spine_detected: bool) -> list[Tuple[str, float | int]]:
     """ This method will calculate the distances between the detected point by the pose estimation and the points
     at the torso of the salamander (which are not detected by the pose estimation). """
 
@@ -714,6 +759,12 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
         # Enlarge the distance a bit such that we make sure the whole belly is captured.
         pelvis_distance = pelvis_distance * scaler
 
+    if few_spine_detected:  # This changes our strategy a bit.
+        distances.append(('pelvis', pelvis_distance))
+        distances.append(('shoulder', shoulder_distance))
+
+        return distances
+
     # Find smallest of both distances.
     if pelvis_distance >= shoulder_distance:
         delta_pelvis_shoulder = pelvis_distance - shoulder_distance
@@ -727,8 +778,6 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
     for point in pose_estimation_dict:
         if point == 'spine_high' or point == 'spine_middle' or point == 'spine_low':
             temp_list.append(point)
-
-    assert len(temp_list) > 0, 'No points on the spine were detected.'
 
     # Calculate the extra distance (that we add every step) necessary for a lineair interpolation.
     extra_distance = delta_pelvis_shoulder / (len(temp_list) + 2)
@@ -766,10 +815,49 @@ def compute_distances_for_torso(pose_estimation_dict) -> list[Tuple[str, float |
     return distances
 
 
-def compute_angle_for_torso(coords_with_distance, pose_estimation_dict) -> list[Tuple[str, float | int]]:
+def compute_angle_for_torso(coords_with_distance, pose_estimation_dict, few_spine_detected: bool) -> (
+        list)[Tuple[str, float | int]]:
     """ This method will calculate the angle needed for a perpendicular line, starting at the detected point
     and ending at the torso of the salamander."""
 
+    coords_with_angle = []
+
+    # If spine_low, spine_middle and spine_high are not detected, then we need to change te strategy a bit.
+    if few_spine_detected:
+
+        if ('left_pelvis' in pose_estimation_dict) and ('right_pelvis' in pose_estimation_dict):
+            point1 = pose_estimation_dict['left_pelvis'][:2]
+            point2 = pose_estimation_dict['right_pelvis'][:2]
+        elif 'left_pelvis' in pose_estimation_dict:
+            point1 = pose_estimation_dict['left_pelvis'][:2]
+            point2 = pose_estimation_dict['spine_lowest'][:2]
+        else:
+            point1 = pose_estimation_dict['right_pelvis'][:2]
+            point2 = pose_estimation_dict['spine_lowest'][:2]
+
+        rico_pelvis = calculate_rico_for_torso(point1, point2)
+        angle_pelvis = calculate_angle_for_torso(0, rico_pelvis)
+
+        coords_with_angle.append(('pelvis', angle_pelvis))
+
+        if ('left_shoulder' in pose_estimation_dict) and ('right_shoulder' in pose_estimation_dict):
+            point1 = pose_estimation_dict['left_shoulder'][:2]
+            point2 = pose_estimation_dict['right_shoulder'][:2]
+        elif 'left_shoulder' in pose_estimation_dict:
+            point1 = pose_estimation_dict['left_shoulder'][:2]
+            point2 = pose_estimation_dict['spine_highest'][:2]
+        else:
+            point1 = pose_estimation_dict['right_shoulder'][:2]
+            point2 = pose_estimation_dict['spine_highest'][:2]
+
+        rico_shoulder = calculate_rico_for_torso(point1, point2)
+        angle_shoulder = calculate_angle_for_torso(0, rico_shoulder)
+
+        coords_with_angle.append(('shoulder', angle_shoulder))
+
+        return coords_with_angle
+
+    # Otherwise we continue in the standard way.
     rico_list = []
     rico_pelvis = 0
     rico_shoulder = 0
@@ -798,7 +886,6 @@ def compute_angle_for_torso(coords_with_distance, pose_estimation_dict) -> list[
 
         rico_list.append((first, second, rico))
 
-    coords_with_angle = []
     # We need to solve an issue when some parts of the pelvis and/or shoulder are not detected well enough by the
     # Pose Estimation.
     need_to_solve_issue_pelvis = False
