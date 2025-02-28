@@ -38,7 +38,8 @@ Pipeline isolate_salamander.py.
 
 
 def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, float]] | None = None,
-                       is_background_removed: bool = False, pose_estimation_evaluation: int = 0) -> np.array:
+                       is_background_removed: bool = False, pose_estimation_evaluation: int = 0) -> (
+                        Tuple)[np.array, bool | None]:
     """ This function will include a bunch of other functions.
 
     INPUT: numpy array image, this must! be in BGR format, this type of image can be obtained by wrapped_imread.
@@ -51,7 +52,8 @@ def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, i
         Value = 1 means the pose estimation failed once, and we will now remove the background and try again.
         Value = 2 means the pose estimation succeeded from the first time, and we will use it to find the belly.
 
-    OUTPUT: A new image that has a black background. The only thing remaining is (the belly of) the salamander. """
+    OUTPUT: A new image that has a black background. The only thing remaining is (the belly of) the salamander.
+    OUTPUT: Boolean or None-type that tells us if spine_high, spine_middle and spine_low were detected or not."""
 
     value = pose_estimation_evaluation
 
@@ -66,18 +68,18 @@ def isolate_salamander(image: np.array, coordinates_pose: Dict[str, Tuple[int, i
         else:
             image_belly = find_belly_with_old_methods(image, is_background_removed=False)
 
-        return image_belly
+        return image_belly, None
 
     elif value == 1:  # We need to remove the background, but leave salamander intact.
         image_no_background, _ = remove_background_old_methods(image)
-        return image_no_background
+        return image_no_background, None
 
     elif value == 2:  # We need to isolate the belly of the salamander using pose estimation.
-        tck, points = find_torso(coordinates_pose)
+        tck, points, few_spine_detected = find_torso(coordinates_pose)
 
         image_belly_with_pose_estimation = remove_everything_outside_curve(image, tck)
 
-        return image_belly_with_pose_estimation
+        return image_belly_with_pose_estimation, few_spine_detected
 
 
 """
@@ -692,7 +694,7 @@ def find_torso(pose_estimation_dict):
 
     tck, u = splprep([x, y], s=0, per=True)
 
-    return tck, points
+    return tck, points, few_spine_detected
 
 
 def calculate_rico_for_torso(point1: Tuple[float | int, float | int], point2: Tuple[float | int, float | int]):
@@ -1068,7 +1070,7 @@ def crop_image(image: np.array, coordinates_pose: Dict[str, Tuple[int, int, floa
 
     Further documentation: see documentation from isolate_salamander. """
 
-    image = isolate_salamander(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
+    image, _ = isolate_salamander(image, coordinates_pose, is_background_removed, pose_estimation_evaluation)
 
     image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     x, y, w, h = cv.boundingRect(image_gray)

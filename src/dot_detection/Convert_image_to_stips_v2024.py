@@ -38,7 +38,7 @@ def preprocess_image(image: np.ndarray):
     """ This method preprocesses the given image. This includes isolating the salamander from the background.
     Thresholding and blurring and trying to preserve as many good edges as possible. """
 
-    image = isolate_salamander(image)
+    image, _ = isolate_salamander(image)
 
     image_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     # x and y denote the linear transformation to the new origin after cropping.

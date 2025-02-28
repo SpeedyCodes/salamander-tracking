@@ -72,7 +72,7 @@ def convert_image_to_coordinate_stips(image: np.ndarray, version: bool = True) -
 
     else:  # New version
 
-        image_isolate = isolate_salamander(image)
+        image_isolate, _ = isolate_salamander(image)
 
         image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         _, image_th_mean, _ = generate_thresholds(image)
@@ -483,7 +483,7 @@ if __name__ == '__main__':
         cv.imshow('original', resize_with_aspect_ratio(img))
         cv.waitKey()
 
-        img_isolate_new = isolate_salamander(img)
+        img_isolate_new, _ = isolate_salamander(img)
         cv.imshow('New version', resize_with_aspect_ratio(img_isolate_new))
         cv.waitKey(0)
 

@@ -51,8 +51,8 @@ class CoordinateExtractor:
         if pose_estimation_evaluation == 1:
             try:
                 # Remove the background.
-                no_background = isolate_salamander(self.image, self.coordinates_pose, False,
-                                                   pose_estimation_evaluation)
+                no_background, _ = isolate_salamander(self.image, self.coordinates_pose, False,
+                                                      pose_estimation_evaluation)
             except AssertionError:
                 pose_estimation_evaluation = 0
             else:
@@ -76,8 +76,9 @@ class CoordinateExtractor:
                 current_image = self.image
 
             try:
-                isolate_image = isolate_salamander(current_image, self.coordinates_pose, is_background_removed,
-                                                   pose_estimation_evaluation)
+                isolate_image, few_spine_detected = isolate_salamander(current_image, self.coordinates_pose,
+                                                                       is_background_removed,
+                                                                       pose_estimation_evaluation)
             except AssertionError:
                 if pose_estimation_evaluation == 2:
                     pose_estimation_evaluation = 0
@@ -87,7 +88,10 @@ class CoordinateExtractor:
                     image_quality = ImageQuality.BAD
             else:
                 if pose_estimation_evaluation == 2:
-                    image_quality = ImageQuality.GOOD
+                    if few_spine_detected:
+                        image_quality = ImageQuality.MEDIUM
+                    else:
+                        image_quality = ImageQuality.GOOD
                 else:
                     image_quality = ImageQuality.MEDIUM
                 break
@@ -121,13 +125,15 @@ class CoordinateExtractor:
             normalised = set([coordinate_transformer.transform(*coordinate) for coordinate in list_coordinates])
             self.straightened_dots_image = coordinate_transformer.show_transformation(self.image)
         else:  # TODO check if the normalisation outside transform() doesn't need to happen even if pose estimation succeeds
-            normalised = [normalisation_of_coordinates(*coordinate, self.cropped_image.shape[1], self.cropped_image.shape[0]) for
-                          coordinate in list_coordinates]
+            normalised = [
+                normalisation_of_coordinates(*coordinate, self.cropped_image.shape[1], self.cropped_image.shape[0]) for
+                coordinate in list_coordinates]
 
         return normalised, image_quality
 
 
-def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[float, float]], ImageQuality, list[np.ndarray]]:
+def image_to_canonical_representation(image: np.ndarray) -> tuple[
+        set[tuple[float, float]], ImageQuality, list[np.ndarray]]:
     """
     Takes in an image and returns the canonical (normalized) representation of the coordinates.
     :param:  image
@@ -136,7 +142,8 @@ def image_to_canonical_representation(image: np.ndarray) -> tuple[set[tuple[floa
     """
     coordinate_extractor = CoordinateExtractor(image)
     coords, quality = coordinate_extractor.extract()
-    return coords, quality, [coordinate_extractor.pose_estimation_image, coordinate_extractor.cropped_image, coordinate_extractor.dot_detection_image, coordinate_extractor.straightened_dots_image]
+    return coords, quality, [coordinate_extractor.pose_estimation_image, coordinate_extractor.cropped_image,
+                             coordinate_extractor.dot_detection_image, coordinate_extractor.straightened_dots_image]
 
 
 def match_canonical_representation_to_database(canonical_representation: set[tuple[float, float]],

@@ -42,7 +42,7 @@ if __name__ == '__main__':
               wrapped_imread('input/2019/2019-Sal18.jpg')]
 
     for index, input in enumerate(inputs):
-        isolated = isolate_salamander(input)
+        isolated, _ = isolate_salamander(input)
         rectangles = cascade.detectMultiScale(isolated)
         # give the annotation file line
         print(f' {len(rectangles)}{ "".join([f" {x} {y} {width} {height}" for (x, y, width, height) in rectangles])}')
