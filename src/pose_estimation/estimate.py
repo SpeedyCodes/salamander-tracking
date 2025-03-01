@@ -7,7 +7,7 @@ from src.pose_estimation.common_paths import working_dir, csv_file_path, h5_file
     config_file_path
 from huey import RedisHuey
 import deeplabcut as dlc
-from config import huey_immediate, pose_estimation_timeout
+from config import huey_immediate, pose_estimation_timeout, pose_estimation_confidence
 
 # This file abstracts away the process of analyzing an image using DeepLabCut.
 # Lots of filesystem-related mess
@@ -73,7 +73,7 @@ def estimate_pose_from_image(image: np.ndarray) -> Tuple[Dict[str, Tuple[int, in
 def draw_pose(image, pose):
     new_image = image.copy()
     for body_part_name, (x, y, confidence) in pose.items():
-        if confidence < 0.6:
+        if confidence < pose_estimation_confidence:
             continue
         cv2.circle(new_image, (x, y), 5, (0, 0, 255), -1)
         cv2.putText(new_image, body_part_name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
