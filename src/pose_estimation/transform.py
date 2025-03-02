@@ -6,6 +6,7 @@ from scipy.interpolate import interp1d, CubicSpline
 from scipy import integrate
 import cv2
 from src.utils import ImageQuality
+from config import pose_estimation_confidence
 
 class CoordinateTransformer:
     """
@@ -33,7 +34,7 @@ class CoordinateTransformer:
                 missing_points.append(body_part_name)
                 continue
             x, y, confidence = datapoints[body_part_name]
-            if confidence < 0.5:
+            if confidence < pose_estimation_confidence:
                 missing_points.append(body_part_name)
                 continue
             x_given.append(x)
@@ -42,12 +43,12 @@ class CoordinateTransformer:
         self.image_quality = ImageQuality.GOOD
 
         if len(missing_points) > 0:
-            self.image_quality = ImageQuality.MEDIUM
+
             # if only one point in the middle is missing, we can interpolate it
             # otherwise, the image is too bad
             if (len(missing_points) > 1 or self.used_points[0] in missing_points
                     or self.used_points[-1] in missing_points):
-                self.image_quality = ImageQuality.BAD
+                self.image_quality = ImageQuality.MEDIUM
                 return  # the image is too bad to interpolate, stop
 
         self.x_given = np.array(x_given)

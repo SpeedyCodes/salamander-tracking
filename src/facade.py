@@ -119,8 +119,8 @@ class CoordinateExtractor:
         list_coordinates = [calculate_centroid_of_rectangle(*coordinate) for coordinate in list_haar_cascade]
         if self.pose_estimation_success:
             coordinate_transformer = CoordinateTransformer(self.coordinates_pose)
-            if coordinate_transformer.image_quality == ImageQuality.BAD:
-                return set(), coordinate_transformer.image_quality
+            if coordinate_transformer.image_quality == ImageQuality.MEDIUM:
+                return set(list_coordinates), ImageQuality.MEDIUM
             image_quality = min(image_quality, coordinate_transformer.image_quality)
             normalised = set([coordinate_transformer.transform(*coordinate) for coordinate in list_coordinates])
             self.straightened_dots_image = coordinate_transformer.show_transformation(self.image)
