@@ -129,8 +129,8 @@ def all_individuals():
     """
     Returns the information of all the salamanders in the database.
     """
-
-    return get_individuals()
+    location_id = request.args.get('location_id', type=int)
+    return get_individuals(location_id)
 
 
 @app.route('/individuals/<string:id>/image', methods=['GET'])
@@ -176,17 +176,14 @@ def intermediate_image(id, intermediate_image_name):
     return Response(image, mimetype='image/png')
 
 @app.route('/sightings', methods=['GET'])
-def get_sightings():
+def get_all_sightings():
     """
     Returns the information of all the sightings in the database.
     """
 
-    query = db.session.query(Sighting).filter(Sighting.individual_id != None)
-
-    if "individual_id" in request.args:
-        query = query.filter(Sighting.individual_id == request.args["individual_id"])
-
-    return query.all()
+    location_id = request.args.get('location_id', type=int)
+    individual_id = request.args.get('individual_id', type=int)
+    return get_sightings(individual_id, location_id)
 
 @app.route('/sightings/<string:id>', methods=['DELETE'])
 def delete_sighting(id):

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import select, insert
 from server.models.individual import Individual
 from server.models.sighting import Sighting
@@ -23,11 +25,26 @@ def get_sighting(sighting_id: int) -> Sighting:
 def get_individual(individual_id: int) -> Individual:
     return db.session.get(Individual, individual_id)
 
-def get_individuals():
-    return db.session.query(Individual).all()
+def get_individuals(location_id: Optional[int] = None) -> list[Individual]:
+    query = db.session.query(Individual)
+    if location_id is not None:
+        # get all individuals for which a sighting exists at the location id
+        query = (
+            query
+            .join(Sighting)
+            .filter(Sighting.location_id == location_id)
+            .distinct()
+        )
+    return query.all()
 
-def get_sightings():
-    return db.session.query(Sighting).all()
+
+def get_sightings(individual_id: Optional[int] = None, location_id: Optional[int] = None) -> list[Sighting]:
+    query = db.session.query(Sighting).filter(Sighting.individual_id != None)
+    if individual_id is not None:
+        query = query.filter(Sighting.individual_id == individual_id)
+    if location_id is not None:
+        query = query.filter(Sighting.location_id == location_id)
+    return query.all()
 
 def confirm_sighting(sighting_id, date, individual_id):
     individual = db.session.get(Individual, individual_id)
