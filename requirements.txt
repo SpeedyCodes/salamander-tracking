@@ -18,3 +18,4 @@ redis
 flask-migrate
 bcrypt
 pyjwt
+flask-restx
