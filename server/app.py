@@ -209,7 +209,7 @@ class GetAllSightings(Resource):
 
         location_id = request.args.get('location_id', type=int)
         individual_id = request.args.get('individual_id', type=int)
-        sightings = get_sightings(location_id, individual_id)
+        sightings = get_sightings(individual_id, location_id)
         return [sighting_asdict(sighting) for sighting in sightings]
 
 @api.route('/sightings/<string:sighting_id>')
