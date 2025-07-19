@@ -77,7 +77,8 @@ class Recognize(Resource):
                 else:
                     j += 1
 
-            converted_list[i]["individual"] = get_individual(converted_list[i]["sighting"].individual_id)
+            converted_list[i]["individual"] = asdict(get_individual(converted_list[i]["sighting"].individual_id))
+            converted_list[i]["sighting"] = sighting_asdict(sighting)
             i += 1
 
         pose_estimation_image = encode_image(intermediates[0]) if intermediates[0] is not None else None
@@ -150,7 +151,8 @@ class IndividualList(Resource):
         Returns the information of all the salamanders in the database.
         """
         location_id = request.args.get('location_id', type=int)
-        return get_individuals(location_id)
+        individuals = get_individuals(location_id)
+        return [asdict(individual) for individual in individuals]
 
 
 @api.route('/individuals/<string:id>/image')
@@ -207,7 +209,8 @@ class GetAllSightings(Resource):
 
         location_id = request.args.get('location_id', type=int)
         individual_id = request.args.get('individual_id', type=int)
-        return get_sightings(individual_id, location_id)
+        sightings = get_sightings(location_id, individual_id)
+        return [sighting_asdict(sighting) for sighting in sightings]
 
 @api.route('/sightings/<string:sighting_id>')
 class SightingCRUD(Resource):
@@ -264,22 +267,22 @@ class Auth(Resource):
             return Response(status=401)
 
         exp = datetime.utcnow() + timedelta(days=1)
-
-        return jwt.encode({'exp': exp}, jwt_secret, algorithm='HS256')
+        return {"token": jwt.encode({'exp': exp}, jwt_secret, algorithm='HS256')}
 @app.before_request
 def check_auth():
     if (request.method not in ['GET', 'OPTIONS']) and request.path != '/auth':
         header = request.headers.get('Authorization')
         if header is None:
-            return Response(status=401)
+            return Response(status=401, response='No authorization header')
         header = header.replace('Bearer ', '')
         try:
             jwt.decode(header, jwt_secret, algorithms=['HS256'])
-            print("success")
+            return None
         except jwt.ExpiredSignatureError:
-            return Response(status=401)
+            return Response(status=401, response='Expired token')
         except jwt.InvalidTokenError:
-            return Response(status=401)
+            return Response(status=401, response='Invalid token ' + header)
+    return None
 
 @app.after_request
 def after_request(response):

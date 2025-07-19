@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Optional
 
 from sqlalchemy import select, insert
@@ -53,3 +54,8 @@ def confirm_sighting(sighting_id, date, individual_id):
     sighting = db.session.get(Sighting, sighting_id)
     sighting.individual_id = individual_id
     sighting.date = date
+
+def sighting_asdict(sighting: Sighting) -> dict:
+    if sighting.date is not None:
+        sighting.date = sighting.date.strftime("%Y-%m-%dT%H:%M:%S.%f")
+    return asdict(sighting)
