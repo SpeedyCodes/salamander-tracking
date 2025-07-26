@@ -276,7 +276,7 @@ class Auth(Resource):
         return {"token": jwt.encode({'exp': exp}, jwt_secret, algorithm='HS256')}
 @app.before_request
 def check_auth():
-    if (request.method not in ['GET', 'OPTIONS']) and request.path != '/auth':
+    if (request.method not in ['GET', 'OPTIONS']) and '/auth' not in request.path:
         header = request.headers.get('Authorization')
         if header is None:
             return Response(status=401, response='No authorization header')
