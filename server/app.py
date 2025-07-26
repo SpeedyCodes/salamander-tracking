@@ -1,7 +1,7 @@
-from flask import Flask, request, Response, render_template, jsonify
+from flask import Flask, request, Response, render_template, jsonify, Blueprint
 import cv2
 import numpy as np
-from flask_restx import Api, Resource
+from flask_restx import Api, Resource,Namespace
 from server.models.image_pipeline import ImagePipeline
 from server.models import Base
 from server.models.named_location import NamedLocation
@@ -23,8 +23,14 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 app.config['SQLALCHEMY_DATABASE_URI'] = PG_CONNECTION_STRING
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-api = Api(app, version='1.0', title='Salamander API',
-            description='API for the Salamander recognition system',)
+
+blueprint = Blueprint('api', __name__, url_prefix='/api')
+api = Api(blueprint, title='Salamander API', description='API for the Salamander recognition system')
+app.register_blueprint(blueprint)
+ns = Namespace(
+    'Salamanders', path="/"
+)
+api.add_namespace(ns)
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -39,7 +45,7 @@ def decode_image(bytestring: bytes):
     return cv2.imdecode(image, cv2.IMREAD_COLOR)
 
 
-@api.route('/store_sighting')
+@ns.route('/store_sighting')
 class Recognize(Resource):
     def post(self):
         """
@@ -96,7 +102,7 @@ class Recognize(Resource):
         }
 
 
-@api.route('/confirm/<string:sighting_id>')
+@ns.route('/confirm/<string:sighting_id>')
 class Confirm(Resource):
     def post(self, sighting_id):
         """
@@ -122,7 +128,7 @@ class Confirm(Resource):
 
 
 
-@api.route('/individuals/<string:individual_id>')
+@ns.route('/individuals/<string:individual_id>')
 class IndividualCRUD(Resource):
     def get(self, individual_id):
         """
@@ -144,7 +150,7 @@ class IndividualCRUD(Resource):
 
 
 
-@api.route('/individuals')
+@ns.route('/individuals')
 class IndividualList(Resource):
     def get(self):
         """
@@ -155,7 +161,7 @@ class IndividualList(Resource):
         return [asdict(individual) for individual in individuals]
 
 
-@api.route('/individuals/<string:id>/image')
+@ns.route('/individuals/<string:id>/image')
 class IndividualImage(Resource):
     def get(self, id):
         """
@@ -167,7 +173,7 @@ class IndividualImage(Resource):
         return Response(image, mimetype='image/png')
 
 
-@api.route('/sightings/<string:id>/image')
+@ns.route('/sightings/<string:id>/image')
 class SightingImage(Resource):
     def get(self, id):
         """
@@ -178,7 +184,7 @@ class SightingImage(Resource):
         image = db.session.get(ImagePipeline, sighting.image_id).original_image
         return Response(image, mimetype='image/png')
 
-@api.route('/sightings/<string:id>/image/<string:intermediate_image_name>')
+@ns.route('/sightings/<string:id>/image/<string:intermediate_image_name>')
 class IntermediateImage(Resource):
     def get(self, id, intermediate_image_name):
         """
@@ -200,7 +206,7 @@ class IntermediateImage(Resource):
                 return Response(status=404)
         return Response(image, mimetype='image/png')
 
-@api.route('/sightings')
+@ns.route('/sightings')
 class GetAllSightings(Resource):
     def get(self):
         """
@@ -212,7 +218,7 @@ class GetAllSightings(Resource):
         sightings = get_sightings(individual_id, location_id)
         return [sighting_asdict(sighting) for sighting in sightings]
 
-@api.route('/sightings/<string:sighting_id>')
+@ns.route('/sightings/<string:sighting_id>')
 class SightingCRUD(Resource):
 
     def put(self, sighting_id):
@@ -240,7 +246,7 @@ class SightingCRUD(Resource):
         db.session.commit()
         return Response(status=200)
 
-@api.route('/locations')
+@ns.route('/locations')
 class LocationCRUD(Resource):
     def post(self):
         """
@@ -258,7 +264,7 @@ class LocationCRUD(Resource):
         locations = db.session.query(NamedLocation).all()
         return [asdict(location) for location in locations]
 
-@api.route('/auth')
+@ns.route('/auth')
 class Auth(Resource):
     def post(self):
         password = request.json["password"]
@@ -293,10 +299,9 @@ def after_request(response):
     response.headers['Vary'] = 'Origin'
     return response
 
-@api.route("/")
-class Frontend(Resource):
-    def index(self):
-        return render_template('index.html')
+@app.route("/")
+def index():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
