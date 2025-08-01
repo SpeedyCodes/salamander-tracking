@@ -1,3 +1,5 @@
+""" This is a demo script to test the step regarding comparison of dot patterns."""
+
 from typing import List, Tuple, Set
 
 from src.utils import wrapped_imread

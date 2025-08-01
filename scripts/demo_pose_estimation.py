@@ -1,3 +1,5 @@
+""" Demo script for pose estimation. """
+
 import cv2
 from os.path import exists
 from src.pose_estimation import estimate_pose_from_image, draw_pose
