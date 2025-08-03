@@ -1,10 +1,18 @@
 import cv2 as cv
+from numpy import ndarray
+
 from src.utils import wrapped_imread
 from src.preprocessing import isolate_salamander
 import threading
 
 
-def draw_rectangles(img, rectangles):
+def draw_rectangles(img: ndarray, rectangles: ndarray) -> ndarray:
+    """
+    Draw rectangles on an image
+    :param img: the image
+    :param rectangles: the rectangles
+    :return: the drawn rectangles
+    """
     line_color = (0, 0, 255)
     line_type = cv.LINE_4
     for (x, y, width, height) in rectangles:
@@ -19,16 +27,27 @@ lock = threading.Lock()
 cascade = cv.CascadeClassifier('training/haar_cascade/cascade/cascade.xml')
 
 
-def dot_detect_haar(image):
+def dot_detect_haar(image: ndarray) -> ndarray:
+    """
+    Perform Dot Detection using Haar Cascade
+    :param image: input image
+    :return: the detected points
+    """
     lock.acquire()
     output = cascade.detectMultiScale(image)
     lock.release()
     return output
 
 
-def draw_dots(image, dots):
+def draw_dots(image: ndarray, rectangles: ndarray) -> ndarray:
+    """
+    Draw dots on an image from rectangles
+    :param image: the image
+    :param dots: the rectangles
+    :return: the drawn dots
+    """
     new_image = image.copy()
-    for rectangle in dots:
+    for rectangle in rectangles:
         start_point = (rectangle[0], rectangle[1])
         end_point = (rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
         cv.rectangle(new_image, start_point, end_point, (255, 0, 0), 2)
