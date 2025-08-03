@@ -14,7 +14,7 @@ See also the [companion app](https://github.com/SpeedyCodes/salamander-tracking-
 
 ## Setup
 - Clone the repo 
-- (optional) Clone the app repo, build it and copy `index.html` to `server/templates` and all other built files to `server/static`.
+- (optional) Clone the app repo, build it with `flutter build web` and copy `index.html` to `server/templates` and all other built files to `server/static`.
 - Spin up a PostgreSQL DB called `salamanders`
 - Fill out config.py
 - Build the docker container
