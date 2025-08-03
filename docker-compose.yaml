@@ -1,0 +1,22 @@
+services:
+  flask:
+    init: true
+    restart: always
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - salamanders_db
+  salamanders_db:
+    init: true
+    image: postgres
+    restart: always
+    user: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: salamanders
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 0s
+      timeout: 5s
+      retries: 10
