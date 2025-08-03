@@ -175,9 +175,29 @@ def select_points_to_be_matched(list_coordinates, tol: float):
         if not is_close:
             selected_points.add(point)
 
-    selected_points = reduce_to_five_points(selected_points)
+    # selected_points = reduce_to_less_points(selected_points)
+    # This method is not added at the moment since it did not give better results.
 
     return selected_points
+
+
+def reduce_to_less_points(list_coordinates, reduced_amount: int = 5):
+    """ This method reduces the amount of points (for example to at most five).
+    With this approach we try to match the most important points,
+    hence the points that lie in the middle.
+
+    Note: this method is not used at the moment since it did not give better results."""
+
+    if not list_coordinates:
+        return set()
+
+    x = [p[0] for p in list_coordinates]
+    y = [p[1] for p in list_coordinates]
+    centroid = (sum(x) / len(list_coordinates), sum(y) / len(list_coordinates))
+
+    sorted_coordinates = sorted(list_coordinates, key=lambda coordinate: math.dist(centroid, coordinate))
+
+    return set(sorted_coordinates[:reduced_amount])
 
 
 """ STEP 2: Check if the number of coordinates/points is approximately equal. """
@@ -190,22 +210,6 @@ def check_number_of_points(list_coordinates1, list_coordinates2, tol: int = 10):
     we know that this ensures good results."""
 
     return abs(len(list_coordinates1) - len(list_coordinates2)) <= tol
-
-
-def reduce_to_five_points(list_coordinates):
-    """ This method reduces the amount of points to at most five. With this approach we only try
-    to match the most important points, hence the points that lie in the middle. """
-
-    if not list_coordinates:
-        return set()
-
-    x = [p[0] for p in list_coordinates]
-    y = [p[1] for p in list_coordinates]
-    centroid = (sum(x) / len(list_coordinates), sum(y) / len(list_coordinates))
-
-    sorted_coordinates = sorted(list_coordinates, key=lambda coordinate: math.dist(centroid, coordinate))
-
-    return set(sorted_coordinates[:5])
 
 
 """ STEP 3: Generating lists of triangles. """
