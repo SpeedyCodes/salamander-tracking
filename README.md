@@ -15,8 +15,18 @@ See also the [companion app](https://github.com/SpeedyCodes/salamander-tracking-
 ## Setup
 - Clone the repo 
 - (optional) Clone the app repo, build it with `flutter build web` and copy `index.html` to `server/templates` and all other built files to `server/static`.
-- Spin up a PostgreSQL DB called `salamanders`
-- Fill out config.py
-- Build the docker container
-- Run the docker container
-- Access the website/API at http://localhost:5000
+- (optional) Fill out config.py with custom settings
+
+To run the software, there are three options. All three should eventually make the 
+website/API accessible at http://localhost:5000 .
+### Run with Docker Compose
+This is the easiest option, if you have Docker Compose: `docker compose up` should do the trick.
+### Run with just Docker and your own PostgreSQL database
+Spin up your database named `salamanders`, and edit the connection string in `config.py` accordingly.
+Next, just build the docker container and run it.
+### Run with Python 3.11.0 and your own PostgreSQL database
+Spin up your database named `salamanders`, and edit the connection string in `config.py` accordingly.
+Next, run these commands:
+- `pip install -r requirements.txt` to install dependencies
+- `python -m server.app` to run the server
+

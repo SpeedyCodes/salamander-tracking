@@ -10,7 +10,7 @@ RUN python -c "import largestinteriorrectangle"
 
 COPY server/ server/
 COPY src/ src/
-COPY training/haar_cascade training/haar_cascade
+COPY training/haar_cascade/cascade/cascade.xml training/haar_cascade/cascade/cascade.xml
 COPY training/dlc/salamander-jesse-2024-09-15 training/dlc/salamander-jesse-2024-09-15
 COPY config.py config.py
 COPY migrations/ migrations/

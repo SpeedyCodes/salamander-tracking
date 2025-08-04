@@ -2,6 +2,8 @@ from flask import Flask, request, Response, render_template, jsonify, Blueprint
 import cv2
 import numpy as np
 from flask_restx import Api, Resource,Namespace
+
+import config
 from server.models.image_pipeline import ImagePipeline
 from server.models import Base
 from server.models.named_location import NamedLocation
@@ -35,6 +37,17 @@ api.add_namespace(ns)
 db.init_app(app)
 migrate = Migrate(app, db)
 
+def set_default_password():
+    if config.default_password != "":
+        # add the default password to the database if none exists
+        passwords = db.session.query(Password).all()
+        if len(passwords) == 0:
+            bytes = config.default_password.encode('utf-8')
+            salt = bcrypt.gensalt()
+            hash = bcrypt.hashpw(bytes, salt).decode('utf-8')
+            newpassword = Password(password=hash)
+            db.session.add(newpassword)
+            db.session.commit()
 
 def encode_image(image: np.ndarray):
     return cv2.imencode('.jpg', image)[1].tobytes()
@@ -304,4 +317,6 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
+    with app.app_context():
+        set_default_password()
     app.run(debug=True, host="0.0.0.0")
