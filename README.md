@@ -8,7 +8,7 @@ It was developed during the course of the Interdisciplinary Project of the Honou
 
 under the supervision of Em. prof. dr. Nick Schryvers.
 
-For a full report including technical details and results, see [report_eng.pdf](report_eng.pdf).
+For a full report including technical details and results, see [report_eng.pdf](report_eng.pdf) or [report_dutch.pdf](report_dutch.pdf).
 
 See also the [companion app](https://github.com/SpeedyCodes/salamander-tracking-frontend).
 
